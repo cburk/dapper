@@ -1,6 +1,10 @@
+#!/usr/bin/env python3
+
 import ldap3
 import argparse
 import cmd, sys
+from src.ldapenumshell import LDAPEnumShell
+
 
 # TODO:
 # 1. Figure out Server's get_info=ALL https://ldap3.readthedocs.io/en/latest/unbind.html
@@ -56,14 +60,6 @@ args = parser.parse_args()
 
 SSL_PORTS=[3269, 636]
 
-def FormatLDAPDomainComponents(domainName):
-	domains=domainName.split(".")
-	formatted_domains = [f"DC={x}" for x in domains]
-	ldapstr = ",".join(formatted_domains)
-	print(ldapstr)
-	return ldapstr
-
-
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
 	prompt = '> '
@@ -75,7 +71,7 @@ class LDAPEnumShell(cmd.Cmd):
 		self.username = username
 		self.password = password
 		print(f"trying {self.hostip}:{self.port}")
-		self.connection = GetConnection(hostip, username, password, port)
+		self.connection = get_connection(hostip, username, password, port)
 		super().__init__()
 
 	def onecmd(self, line):
@@ -116,44 +112,14 @@ class LDAPEnumShell(cmd.Cmd):
 		print(f"Executing search with query: {arg}")
 		#ErlRce.EXECUTE_REMOTE_COMMAND(arg, self.cookie, self.port, self.host)
 
-def GetConnection(hostip, username, password, port):
-	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS))
-
-	connection = ldap3.Connection(server)
-
-	connection.bind()
-
-	return connection
-
-def TryEnumerateServerInfo(port):
-	server = ldap3.Server(args.hostip, port =port, use_ssl = (port in SSL_PORTS))	
-	# server = ldap3.Server(args.hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
-
-	connection = ldap3.Connection(server)
-
-	try:
-		connsucceeded = connection.bind()
-	except ldap3.core.exceptions.LDAPSocketOpenError:
-		connsucceeded=False
-	
-	print(f"{port}: " + ("Connected successfully" if connsucceeded else "Failed to connect"))
-
-	if connsucceeded:
-		print(server.info)
-
-	if not connection.closed:	
-		connection.unbind()
-	return connsucceeded
-
-
 successfulPorts=[]
-if TryEnumerateServerInfo(389):
+if try_enumerate_server_info(389):
 	successfulPorts.append(389)
-if TryEnumerateServerInfo(636):
+if try_enumerate_server_info(636):
 	successfulPorts.append(389)
-if TryEnumerateServerInfo(3268):
+if try_enumerate_server_info(3268):
 	successfulPorts.append(3268)
-if TryEnumerateServerInfo(3269):
+if try_enumerate_server_info(3269):
 	successfulPorts.append(3269)
 
 if len(successfulPorts) > 0:
@@ -163,7 +129,7 @@ if len(successfulPorts) > 0:
 	# TODO: Try various auth methods, see if we can get above anonymous user: https://ldap3.readthedocs.io/en/latest/tutorial_intro.html#logging-into-the-server
 
 
-	LDAPEnumShell(args.hostip, args.hostdomain, currentPort, args.username, args.password).cmdloop()
+	LDAPEnumShell(args.hostip, args.hostdomain, currentPort, args.username, args.password, lambda ip,host,port,user,password: get_connection(ip,user,password,port)).cmdloop()
 else:
 	print(f"FAILURE: Could not successfully connect to any ports")
 
