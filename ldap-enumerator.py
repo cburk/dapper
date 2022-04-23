@@ -3,8 +3,10 @@
 import ldap3
 import argparse
 import cmd, sys
-from src.ldapenumshell import LDAPEnumShell
-
+from code.src.connectionconstructors import try_enumerate_server_info,get_connection
+from code.src.ldapenumshell import LDAPEnumShell
+from code.src.queryformatter import format_ldap_domain_components
+from code.src.consts import SSL_PORTS
 
 # TODO:
 # 1. Figure out Server's get_info=ALL https://ldap3.readthedocs.io/en/latest/unbind.html
@@ -58,68 +60,14 @@ parser.add_argument('-password', type=str)
 parser.add_argument('-username', type=str)
 args = parser.parse_args()
 
-SSL_PORTS=[3269, 636]
-
-class LDAPEnumShell(cmd.Cmd):
-	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
-	prompt = '> '
-
-	def __init__(self, hostip, hostdomain, port, username, password):
-		self.hostip = hostip
-		self.hostdomain = hostdomain
-		self.port = port
-		self.username = username
-		self.password = password
-		print(f"trying {self.hostip}:{self.port}")
-		self.connection = get_connection(hostip, username, password, port)
-		super().__init__()
-
-	def onecmd(self, line):
-		try:
-			return super().onecmd(line)
-		except ldap3.core.exceptions.LDAPSocketOpenError as e:
-			print(f"FAILURE: LDAPSocketOpenError {e.args} thrown attempting to query users, if \"invalid server address\" and base connection works, then domain name (or formatted domain components query string) is likely invalid")
-			if not self.connection.closed:	
-				self.connection.unbind()
-			quit()
-		except BaseException as e:
-			print(f"FAILURE: encountered {e}")
-			if not self.connection.closed:	
-				self.connection.unbind()
-			quit()
-
-
-	def do_enum_users(self, arg):
-		#print(f"Executing command: {arg}")
-		domaincomponents=FormatLDAPDomainComponents(self.hostdomain)
-
-		self.connection.search(search_base=domaincomponents,
-			search_filter='(&(objectClass=user)(objectClass=person))',
-			search_scope='SUBTREE',
-			attributes='*')
-
-		print(self.connection.entries)
-		# TODO: Clear entries after query?  
-
-	def do_quit(self, args):
-		print("Exiting...")
-		if not connection.closed:	
-			connection.unbind()
-		quit()
-
-
-	def default(self, arg):
-		print(f"Executing search with query: {arg}")
-		#ErlRce.EXECUTE_REMOTE_COMMAND(arg, self.cookie, self.port, self.host)
-
 successfulPorts=[]
-if try_enumerate_server_info(389):
+if try_enumerate_server_info(args.hostip,389):
 	successfulPorts.append(389)
-if try_enumerate_server_info(636):
+if try_enumerate_server_info(args.hostip,636):
 	successfulPorts.append(389)
-if try_enumerate_server_info(3268):
+if try_enumerate_server_info(args.hostip,3268):
 	successfulPorts.append(3268)
-if try_enumerate_server_info(3269):
+if try_enumerate_server_info(args.hostip,3269):
 	successfulPorts.append(3269)
 
 if len(successfulPorts) > 0:

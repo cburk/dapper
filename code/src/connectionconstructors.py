@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import ldap3
+from code.src.consts import SSL_PORTS
+
 def get_connection(hostip, username, password, port):
 	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS))
 
@@ -9,8 +12,8 @@ def get_connection(hostip, username, password, port):
 
 	return connection
 
-def try_enumerate_server_info(port):
-	server = ldap3.Server(args.hostip, port =port, use_ssl = (port in SSL_PORTS))	
+def try_enumerate_server_info(hostip, port):
+	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS))	
 	# server = ldap3.Server(args.hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
 
 	connection = ldap3.Connection(server)
