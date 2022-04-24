@@ -3,7 +3,7 @@
 import ldap3
 import argparse
 import cmd, sys
-from code.src.connectionconstructors import try_enumerate_server_info,get_connection
+from code.src.connectionhelpers import try_enumerate_server_info,get_connection
 from code.src.ldapenumshell import LDAPEnumShell
 from code.src.queryformatter import format_ldap_domain_components
 from code.src.consts import SSL_PORTS

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import ldap3
 import cmd, sys
-from code.src.connectionconstructors import try_enumerate_server_info,get_connection
+from code.src.connectionhelpers import try_enumerate_server_info,get_connection
 from code.src.queryformatter import format_ldap_domain_components
-from code.src.consts import SSL_PORTS
 
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
