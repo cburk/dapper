@@ -3,8 +3,12 @@
 import ldap3
 from code.src.consts import SSL_PORTS
 
-def get_connection(hostip, username, password, port):
-	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS))
+# def can_user_authenticate(hostip, username, password, port):
+	
+
+def get_connection(hostip, port):
+
+	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
 
 	connection = ldap3.Connection(server)
 
@@ -12,9 +16,8 @@ def get_connection(hostip, username, password, port):
 
 	return connection
 
-def try_enumerate_server_info(hostip, port):
-	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS))	
-	# server = ldap3.Server(args.hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
+def try_connect(hostip, port):
+	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.NONE)
 
 	connection = ldap3.Connection(server)
 
@@ -25,9 +28,24 @@ def try_enumerate_server_info(hostip, port):
 	
 	print(f"{port}: " + ("Connected successfully" if connsucceeded else "Failed to connect"))
 
-	if connsucceeded:
-		print(server.info)
-
 	if not connection.closed:	
 		connection.unbind()
 	return connsucceeded
+
+def get_server_supported_sasl_authentication_methods(hostip, port):
+	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
+
+	connection = ldap3.Connection(server)
+
+	connection.bind()
+
+	# Treat none as any
+	supported = server.info.supported_sasl_mechanisms if (server.info != None and server.info.supported_sasl_mechanisms != None) else None 
+	print(f"Supported sasl auth methods: {supported}")
+
+	if not connection.closed:	
+		connection.unbind()
+
+	return supported
+
+

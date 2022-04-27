@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import ldap3
 import cmd, sys
-from code.src.connectionhelpers import try_enumerate_server_info,get_connection
+from code.src.connectionhelpers import try_connect,get_connection
 from code.src.queryformatter import format_ldap_domain_components
 
 class LDAPEnumShell(cmd.Cmd):
@@ -15,7 +15,7 @@ class LDAPEnumShell(cmd.Cmd):
 		self.username = username
 		self.password = password
 		print(f"trying {self.hostip}:{self.port}")
-		self.connection = create_connection(hostip, hostdomain, username, password, port)
+		self.connection = create_connection(hostip,hostdomain,port,username,password)
 		super().__init__()
 
 	def onecmd(self, line):
@@ -36,6 +36,10 @@ class LDAPEnumShell(cmd.Cmd):
 
 	def do_enum_users(self, arg):
 		#print(f"Executing command: {arg}")
+
+		# TODO: If we can get server info, shouldn't we be setting this to this:
+		# server.info.rootDomainNamingContext or server.info.defaultNamingContext
+
 		domaincomponents=format_ldap_domain_components(self.hostdomain)
 
 		self.connection.search(search_base=domaincomponents,
@@ -45,6 +49,26 @@ class LDAPEnumShell(cmd.Cmd):
 
 		print(self.connection.entries)
 		# TODO: Clear entries after query?  
+
+	def do_enum_server_info(self, args):
+		print(self.connection.server.info.__dict__)
+		# useful (non verbose output):
+		# server.info.naming_contexts
+		# server.info.alt_servers
+		# server.info.supported_ldap_versions
+		# server.info.supported_sasl_mechanisms
+		# server.info.other.dnsHostName
+		# server.info.other.rootDomainNamingContext
+		# server.info.other.dnsHostName
+		# supportedcontrols doesn't seem too useful, except for https://ldapwiki.com/wiki/Get%20Effective%20Rights%20Control 
+		print(self.connection.server.info)
+
+	def do_whoami(self, args):
+		ldapuser=self.connection.extend.standard.who_am_i() if self.connection.extend != None else None
+		if ldapuser:
+			print(f"User: {ldapuser}")
+		else:
+			print(f"Connection returned no current user.  This is likely because authentication failed or wasn't attempted (i.e. this is an anonymous bind)")
 
 	def do_quit(self, args):
 		print("Exiting...")

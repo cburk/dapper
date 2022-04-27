@@ -48,6 +48,19 @@ class TestDisposal(unittest.TestCase):
 
 
 class TestSearch(unittest.TestCase):
+	def test_enum_users_nohostdomain_should_printerror_and_notsearch(self):
+		actualcall={}
+		mockconnection=MagicMock()
+		mockconnection.closed=False
+		searchmock=MagicMock()
+
+		shell=LDAPEnumShell("1.2.3.4",None,"111",None,None,lambda ip,host,port,user,password: mockconnection)
+		shell.onecmd("enum_users")
+
+		mockconnection.search.assert_called_with(search_base=format_ldap_domain_components(domain),search_filter="(&(objectClass=user)(objectClass=person))",search_scope=ANY, attributes=ANY)
+
+		# TODO: For more complex tests: https://ldap3.readthedocs.io/en/latest/mocking.html
+
 	def test_enum_users_should_formatrequestproperly(self):
 		actualcall={}
 		mockconnection=MagicMock()
@@ -59,6 +72,8 @@ class TestSearch(unittest.TestCase):
 		shell.onecmd("enum_users")
 
 		mockconnection.search.assert_called_with(search_base=format_ldap_domain_components(domain),search_filter="(&(objectClass=user)(objectClass=person))",search_scope=ANY, attributes=ANY)
+
+		# TODO: For more complex tests: https://ldap3.readthedocs.io/en/latest/mocking.html
 
 if __name__ == '__main__':
 	unittest.main()
