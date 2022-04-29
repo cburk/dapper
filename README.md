@@ -7,6 +7,8 @@ Specifically intended to automate some common pre-auth enumeration queries that 
 
 My intention is to keep this tool light weight and compartmentalized.  This should allow newcomers to modify the tool to suit their particular needs and read the code to learn some basic ldap concepts.
 
+In that spirit: I'm still learning LDAP and active directory concepts myself, so if you see issues with my code or terminology please let me know!
+
 Built for and tested on Kali Linux.
 
 ## Disclaimers: ## 

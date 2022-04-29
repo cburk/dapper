@@ -3,34 +3,12 @@
 import ldap3
 import argparse
 import cmd, sys
-from code.src.connectionhelpers import try_connect,get_connection,get_server_supported_sasl_authentication_methods
+from code.src.connectionhelpers import try_connect,get_connection,get_server_supported_sasl_authentication_methods,try_get_authenticated_connection,get_authenticated_connection
 from code.src.ldapenumshell import LDAPEnumShell
 from code.src.queryformatter import format_ldap_domain_components
 from code.src.consts import SSL_PORTS
 
-# Domain name - Dependencies:
-# - dn > enum_*
-# - dn > auth
-# basically because anonymous might fail and we need it for auth, do want to allow users to pass it in.  but, we also want to
-# make sure that by the time we get to enum if they don't have it they can still enumerate.  So in ***init*** we should pull the 
-# rootDomainNamingContext and compare with domainname.  If latter is null or empty, just use it (formatted to domain name).  
-# if they both exist and are different though, should prompt them to replace with valid one
-
 # TODO:
-# 1. Figure out Server's get_info=ALL https://ldap3.readthedocs.io/en/latest/unbind.html
-#   - That field is what MUST be read: https://ldap3.readthedocs.io/en/latest/server.html
-#     * But it doesn't seem to bea field1 & field2 & ..., because default is just schema (returns nothing) and all is schema+server info (does return info)
-#   - Works really well in Hutch, even tho it's an anon session.  Gives us:
-#     * Root naming context
-#     * All naming contexts
-#     * Supported ldap version
-#     * ldapServiceName: (?)
-#     * dnsHostName: hutchdc.hutch.offsec 
-#   - Need to figure out if there are drawbacks to using ^, diffs between authd vs unauthed, how to make use of different contexts, etc
-# 2. Auth
-#   - https://ldap3.readthedocs.io/en/latest/tutorial_intro.html#logging-into-the-server
-#   - See lines near bottom, seems like logical place for it (specifically conn.extend.standard.who_am_i())
-#   - 
 # 3. Cleanup for github
 #   - Add unit tests ***
 #   - Add readme?  Probably just pip installs / requirements, running tests, and how to get help prompt.  Might need legal disclaimer about legimate use? 
@@ -61,6 +39,8 @@ from code.src.consts import SSL_PORTS
 # Outfiles option for all these?
 #   - Seems like we could build into OneCmd, look for that flag, and if so redirect output somehow (have each exec return a string?  pass in file descriptor for stdout or file name?)
 # Built in GetPasswordPolicy query
+# Built in Wildcard search for email type fields? 
+
 # Default to custom query
 # TODO: Better error handling / housekeeping
 #   - calling unbind should disconnect everything
@@ -96,48 +76,8 @@ if try_connect(args.hostip,3268):
 if try_connect(args.hostip,3269):
 	successfulPorts.append(3269)
 
-# TODO: anonymous connection could've been turned off for all but user would still work.  In that case, should we prompt them
-# before trying with creds on all ports? 
-
-SUPPORTED_SASL_AUTH_METHODS = ["DIGEST-MD5","whateverntlmis"]
-
-def get_authenticated_connection(hostip,realm,port,username,password,authentication_method):
-	if authentication_method == "SIMPLE":
-		s = ldap3.Server(hostip, port=port,get_info=ldap3.ALL)
-		c = ldap3.Connection(s, user=username, password=password)
-		c.bind()
-		return c
-	elif authentication_method ==  "DIGEST-MD5":
-		realm = args.hostdomain if args.hostdomain else None # None leads to use of server default realm 
-		# sounds like whatever user is probably fine
-		raise Exception("Not yet implemented (TODO)")
-	elif authentication_method == "whateverntlmis":
-		username="a" # TODO: Should we try to do this smart (i.e. mydomain.local,userA => mydomain\userA) or just trust users on format?  
-		# probably fine to just trust them, this should primarily be for unauth'd, after all.  maybe print warning if format isn't that of an AD user
-		raise Exception("Not yet implemented (TODO)")
-	else:
-		raise Exception(f"Unknown or unsupported authentication method {authentication_method}")	
-
-def try_get_authenticated_connection(hostip,realm,port,username,password,authentication_method):
-	try:
-		conn = get_authenticated_connection(hostip,realm,port,username,password,authentication_method)
-		print(f"{authentication_method}: {username} - {conn.extend.standard.who_am_i()}")
-		# TODO: Probably a more sophisticated way to check, but potentially difficult (e.g. encountered username user@dom.ain => whoami dom\user)
-		# and doesn't seem that important to check.  Potential risk if a server ever returns "Anonymous" or similar, but seems unlikely
-		connsucceeded = conn.bound and conn.extend.standard.who_am_i()
-	except ldap3.core.exceptions.LDAPSocketOpenError:
-		connsucceeded=False
-	
-	print(f"{port}: " + ("Connected successfully" if connsucceeded else "Failed to connect"))
-
-	if not conn.closed:	
-		conn.unbind()
-	return connsucceeded
-
-	# TODO: LDAPS ports
-
 def try_authenticate(hostip,realm,port,username,password,server_supported_sasl_authentication_methods):
-	if not (username or password):
+	if (not username or username is None) or (not password or password is None):
 		return (False,None)
 
 	# Try simple authentication first

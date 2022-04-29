@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import MagicMock, Mock, patch, ANY
 from code.src.ldapenumshell import LDAPEnumShell 
 from code.src.queryformatter import format_ldap_domain_components 
 import ldap3
@@ -19,10 +19,12 @@ class FakeConnection():
 def raise_exception(e):
 	raise e
 
+
 class TestDisposal(unittest.TestCase):
 	def test_dispose_on_error(self):
 		mockconnection=MagicMock()
 		mockconnection.closed=False
+		mockconnection.server.info.other = { "rootDomainNamingContext": ["c.d.e"] }
 		mockconnection.search = lambda search_base,search_filter,search_scope,attributes: raise_exception(ldap3.core.exceptions.LDAPSocketOpenError("assertexceptioninternalmessage"))
 
 		capturedOutput = io.StringIO()          # For capturing print output
@@ -39,6 +41,7 @@ class TestDisposal(unittest.TestCase):
 	def test_dispose_on_quit(self):
 		mockconnection=MagicMock()
 		mockconnection.closed=False
+		mockconnection.server.info.other = { "rootDomainNamingContext": ["c.d.e"] }
 		mockconnection.search = lambda search_base,search_filter,search_scope,attributes: raise_exception(ldap3.core.exceptions.LDAPSocketOpenError())
 
 		shell=LDAPEnumShell("1.2.3.4","a.b.c","111",None,None,lambda ip,host,port,user,password: mockconnection)
@@ -48,24 +51,30 @@ class TestDisposal(unittest.TestCase):
 
 
 class TestSearch(unittest.TestCase):
-	def test_enum_users_nohostdomain_should_printerror_and_notsearch(self):
+	def test_enum_users_should_formatrequestproperly_serverrootdomaincomponents(self):
+		serverrootdomaincomponents = "c.d.e"		
+
 		actualcall={}
 		mockconnection=MagicMock()
 		mockconnection.closed=False
 		searchmock=MagicMock()
+		mockconnection.server.info.other = { "rootDomainNamingContext": [serverrootdomaincomponents] }
 
-		shell=LDAPEnumShell("1.2.3.4",None,"111",None,None,lambda ip,host,port,user,password: mockconnection)
+		domain="a.b.c"
+		shell=LDAPEnumShell("1.2.3.4",domain,"111",None,None,lambda ip,host,port,user,password: mockconnection)
 		shell.onecmd("enum_users")
 
-		mockconnection.search.assert_called_with(search_base=format_ldap_domain_components(domain),search_filter="(&(objectClass=user)(objectClass=person))",search_scope=ANY, attributes=ANY)
+		mockconnection.search.assert_called_with(search_base=serverrootdomaincomponents,search_filter="(&(objectClass=user)(objectClass=person))",search_scope=ANY, attributes=ANY)
 
 		# TODO: For more complex tests: https://ldap3.readthedocs.io/en/latest/mocking.html
 
-	def test_enum_users_should_formatrequestproperly(self):
+	def test_enum_users_should_formatrequestproperly_domainformatteddomaincomponents(self):
 		actualcall={}
-		mockconnection=MagicMock()
+		mockconnection=Mock()
 		mockconnection.closed=False
-		searchmock=MagicMock()
+		print("Me")
+		mockconnection.server.info = None
+		print(f"Me: {mockconnection.server.info}")
 
 		domain="a.b.c"
 		shell=LDAPEnumShell("1.2.3.4",domain,"111",None,None,lambda ip,host,port,user,password: mockconnection)
