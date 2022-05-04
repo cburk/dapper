@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import ldap3
-import cmd, sys, os
+import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import format_ldap_domain_components
+from code.src.queryformatter import format_ldap_domain_components,response_properties_subset
 
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
 	prompt = '> '
+	common_args_description = "--outfile {filename} to output results to file.  -v for verbose output (unformatted ldap response)"
 
 	def get_server_domain_components(self):
 		serverinfo=self.connection.server.info
@@ -20,6 +21,10 @@ class LDAPEnumShell(cmd.Cmd):
 			print(f"Warning: expected one root naming context, found: {rootcontexts}")
 			
 		return rootcontexts[0]
+	
+	def do_help(self, arg):
+		print(self.common_args_description)
+		super().do_help(arg)
 
 	def __init__(self, hostip, hostdomain, port, username, password, create_connection):
 		self.hostip = hostip
@@ -63,7 +68,6 @@ class LDAPEnumShell(cmd.Cmd):
 		try:
 			# Handle shared args
 			if line:
-				print(f"Line: {line}")
 				components = line.split()
 				if "--outfile" in components:
 					outind = components.index("--outfile")	
@@ -98,17 +102,46 @@ class LDAPEnumShell(cmd.Cmd):
 		return stop
 
 	def do_enum_users(self, arg):
-		#print(f"Executing command: {arg}")
-
+		'gets users'		
+		
 		self.connection.search(search_base=self.domaincomponents,
 			search_filter='(&(objectClass=user)(objectClass=person))',
 			search_scope='SUBTREE',
 			attributes='*')
 
-		self.writeline(self.connection.entries)
+		components=[]
+		if arg and arg is not None:
+			components = arg.split()
+		if "-v" in components:
+			self.writeline(self.connection.entries)
+		else:
+			res = self.connection.response_to_json()
+			formattedentries = response_properties_subset(res,["userAccountControl","sAMAccountName","userPrincipalName","description"])
+			self.writeline(json.dumps(formattedentries, indent=4))	
+				
 		# TODO: Clear entries after query?  
 
+	def do_enum_groups(self, arg):
+		'gets groups'		
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter='(objectClass=group)',
+			search_scope='SUBTREE',
+			attributes='*')
+
+		components=[]
+		if arg and arg is not None:
+			components = arg.split()
+		if "-v" in components:
+			self.writeline(self.connection.entries)
+		else:
+			res = self.connection.response_to_json()
+			#formattedentries = self.properties_subset(res,["name","objectSid","objectGUID"])
+			formattedentries = response_properties_subset(res,["name"])
+			self.writeline(json.dumps(formattedentries, indent=4))	
+	
 	def do_enum_server_info(self, args):
+		'gets server info from DSE. '		
+
 		print(self.connection.server.info.__dict__)
 		# useful (non verbose output):
 		# server.info.naming_contexts
@@ -133,8 +166,18 @@ class LDAPEnumShell(cmd.Cmd):
 		self.cleanup()
 		return True
 
+	def do_exit(self, args):
+		print("Exiting...")
+		self.cleanup()
+		return True
 
 	def default(self, arg):
-		print(f"Executing search with query: {arg}")
-		print(f"ERROR: Not implemented")
-		#ErlRce.EXECUTE_REMOTE_COMMAND(arg, self.cookie, self.port, self.host)
+		self.writeline(f"Executing search with query: {arg}")
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=arg,
+			search_scope='SUBTREE',
+			attributes='*')
+
+		self.writeline(self.connection.entries)
+
+

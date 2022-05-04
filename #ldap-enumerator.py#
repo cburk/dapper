@@ -3,7 +3,7 @@
 import ldap3
 import argparse
 import cmd, sys
-from code.src.connectionhelpers import try_connect,get_connection,get_server_supported_sasl_authentication_methods,try_get_authenticated_connection,get_authenticated_connection
+from code.src.connectionhelperss import try_connect,get_connection,get_server_supported_sasl_authentication_methods,try_get_authenticated_connection,get_authenticated_connection
 from code.src.ldapenumshell import LDAPEnumShell
 from code.src.queryformatter import format_ldap_domain_components
 from code.src.consts import SSL_PORTS
@@ -24,12 +24,18 @@ from code.src.consts import SSL_PORTS
 #   - Before dropping into shell list working ports, offer ability to switch between (might want to query
 #   both global catologue and main domain ldap?  Think we should default to main since global has subset)
 
+# Search tasks: 
+# TODO: auto_range
+#   Seems important for the data sets we're interested in (i.e. biggish AD data sets where it's difficult to parse manually)
+
+
 # Built in GetUsers query (&(objectClass=user)(objectClass=person))
 #  - with ad username format, emails, description fields, etc
-#  - *** Need ability to translate UAC int/bitstring to human readable 
-#    * https://docs.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
-#    * can probably just make list of these values, & with UAC value and see if that returns anything? 
 # Built in GetComputers query
+# Built in GetGroups query
+#   - e.g. CN=Users,DC=hutch,DC=offsec where objectClass=organizationalPerson
+# Outfiles option for all these?
+#   - Seems like we could build into OneCmd, look for that flag, and if so redirect output somehow (have each exec return a string?  pass in file descriptor for stdout or file name?)
 # Built in GetPasswordPolicy query
 # Built in Wildcard search for email type fields? 
 

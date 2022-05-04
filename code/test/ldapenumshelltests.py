@@ -6,19 +6,8 @@ import ldap3
 import io
 import sys
 
-class FakeConnection():
-	closed=False
-
-	
-
-	def unbind():
-		print("Hello world")
-	
-
-
 def raise_exception(e):
 	raise e
-
 
 class TestDisposal(unittest.TestCase):
 	def test_dispose_on_error(self):

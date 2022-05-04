@@ -10,7 +10,7 @@ def get_connection(hostip, port):
 
 	server = ldap3.Server(hostip, port =port, use_ssl = (port in SSL_PORTS), get_info=ldap3.ALL)
 
-	connection = ldap3.Connection(server)
+	connection = ldap3.Connection(server, auto_range=True)
 
 	connection.bind()
 
@@ -51,7 +51,7 @@ def get_server_supported_sasl_authentication_methods(hostip, port):
 def get_authenticated_connection(hostip,realm,port,username,password,authentication_method):
 	if authentication_method == "SIMPLE":
 		s = ldap3.Server(hostip, port=port,get_info=ldap3.ALL)
-		c = ldap3.Connection(s, user=username, password=password)
+		c = ldap3.Connection(s, user=username, password=password, auto_range=True)
 		c.bind()
 		return c
 	elif authentication_method ==  "DIGEST-MD5":
