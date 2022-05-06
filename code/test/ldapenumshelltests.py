@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, Mock, patch, ANY
-from code.src.ldapenumshell import LDAPEnumShell 
+from code.src.ldapenumshell import LDAPEnumShell, find_args
 from code.src.queryformatter import format_ldap_domain_components 
 import ldap3
 import io
@@ -9,6 +9,34 @@ import sys
 def raise_exception(e):
 	raise e
 
+class TestArgsFormatter(unittest.TestCase):
+	def test_one_arg(self):
+		aval = "has spaces and stuff"
+		argstr = f"-a {aval}"
+		
+		res = find_args(["-a","-b"], argstr)
+		
+		self.assertTrue(res["-a"] == aval)
+		self.assertFalse("-b" in res.keys())
+		
+	def test_multi_arg(self):
+		aval = "has spaces and stuff"
+		bval = "more-standard"
+		argstr = f"-b {bval} -a {aval}"
+		
+		res = find_args(["-a","-b"], argstr)
+		
+		self.assertTrue(res["-a"] == aval)
+		self.assertTrue(res["-b"] == bval)
+
+	def test_whitespace(self):
+		aval = "onlythismatters"
+		argstr = f" -a       {aval}   "
+		
+		res = find_args(["-a","-b"], argstr)
+		
+		self.assertTrue(res["-a"] == aval)
+		
 class TestDisposal(unittest.TestCase):
 	def test_dispose_on_error(self):
 		mockconnection=MagicMock()

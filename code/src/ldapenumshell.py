@@ -4,6 +4,34 @@ import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
 from code.src.queryformatter import format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags
 
+def find_args(argnames, stringinput):
+	indtoname = {}
+
+	for arg in argnames:
+		if arg in stringinput:
+			startind = stringinput.index(arg)
+			indtoname[startind] = arg
+			
+	keyvaluepairs = {}
+	indssorted = list(indtoname.keys())
+	indssorted.sort()
+	i = 0
+	for i in range(len(indssorted)):
+		argind = indssorted[i]
+		arg = indtoname[argind]
+
+		valuestartind = argind + len(arg)
+		if i + 1 == len(indssorted):
+			valueendind = len(stringinput)
+		else:
+			valueendind = indssorted[i+1] - 1
+		value = stringinput[valuestartind:valueendind]
+		value = value.lstrip().rstrip()
+		print(f"{arg}:{value}")
+		keyvaluepairs[arg] = value
+	return keyvaluepairs
+
+
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
 	prompt = '> '
@@ -210,7 +238,7 @@ class LDAPEnumShell(cmd.Cmd):
 		dn = self.domaincomponents
 		filt = "(objectClass=*)"
 
-		args = self.find_args(["-rdns","-filter"],arg)
+		args = find_args(["-rdns","-filter"],arg)
 		
 		if "-filter" in args.keys():
 			filt = args["-filter"]
