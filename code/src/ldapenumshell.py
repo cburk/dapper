@@ -2,7 +2,7 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import format_ldap_domain_components,response_properties_subset
+from code.src.queryformatter import format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags
 
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
@@ -117,7 +117,15 @@ class LDAPEnumShell(cmd.Cmd):
 		else:
 			res = self.connection.response_to_json()
 			formattedentries = response_properties_subset(res,["userAccountControl","sAMAccountName","userPrincipalName","description"])
-			self.writeline(json.dumps(formattedentries, indent=4))	
+			for entry in formattedentries:
+				if "userAccountControl" in entry.keys():
+						uacbitstring = entry["userAccountControl"]
+						try:
+							entry["userAccountControlFormatted"] = uac_bitstring_to_flags(int(uacbitstring))
+						except ValueError:
+							print(f"Could not parse UAC: {uacbitstring}")
+
+			self.writeline(json.dumps(formattedentries, indent=4))
 				
 		# TODO: Clear entries after query?  
 
@@ -171,13 +179,53 @@ class LDAPEnumShell(cmd.Cmd):
 		self.cleanup()
 		return True
 
-	def default(self, arg):
-		self.writeline(f"Executing search with query: {arg}")
-		self.connection.search(search_base=self.domaincomponents,
-			search_filter=arg,
-			search_scope='SUBTREE',
-			attributes='*')
+	def find_args(self, argnames, stringinput):
+		indtoname = {}
+		
+		for arg in argnames:
+			if arg in stringinput:
+				startind = stringinput.index(arg)
+				indtoname[startind] = arg
+				
+		keyvaluepairs = {}
+		indssorted = indtoname.keys().sort()
+		i = 0
+		for i in range(len(indssorted)):
+			argind = indssorted[i]
+			arg = indtoname[argind]
+			
+			valuestartind = argind + len(arg)
+			if i + 1 == len(indssorted):
+				valueendind = len(stringinput) - 1
+			else:
+				valueendind = indssorted[i+1] - 1
+			value = stringinput[valuestartind:valueendind]
+			print(f"{arg}:{value}")
+			keyvaluepairs[arg] = value
+		return keyvaluepairs
+		
+	def do_search(self, arg):
+		'executes custom query under root context.\nflags are -rdns and -filter (e.g. -rdns ou=pwpolicies -filter x)'
+		
+		dn = self.domaincomponents
+		filt = "(objectClass=*)"
 
-		self.writeline(self.connection.entries)
+		args = self.find_args(["-rdns","-filter"],arg)
+		
+		if "-filter" in args.keys():
+			filt = args["-filter"]
+		if "-rdns" in args.keys():
+			dn += args["-rdns"]
+		
+		print(f"filter: {filt}")
+		print(f"dn: {dn}")
+					
+		#self.connection.search(search_base=dn,
+		#	search_filter=filt,
+		#	search_scope='SUBTREE',
+		#	attributes='*')
+#
+		#self.writeline(self.connection.entries)
 
+	
 

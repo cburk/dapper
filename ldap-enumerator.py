@@ -11,27 +11,33 @@ from code.src.consts import SSL_PORTS
 # TODO:
 # 3. Cleanup for github
 #   - *** Figure out error handling (currently it's just closing connection and continuing.  Should either raise and kill program or not close connection
+#   - Should we add a minimal option? (-m)
+#		* Could just be a small list of the one most important value (e.g. for users, just principalname)
+#       * also want consistency between output format of -v and default 
 #   - Improve unit tests
 #   - Add readme?  Probably just pip installs / requirements, running tests, and how to get help prompt.  Might need legal disclaimer about legimate use? 
 #     * Should also have disclaimer that it's a student project, untested for inter-domain scenarios AND be aware of lockout implications, logging, etc
 #   - spellcheck lol? 
-#   - fun name?
-#     * Could try to keep with literary names
-#     * Dap (like the fist bump, w/ ascii art) could be fun though
-#     * maybe a le carre character, pre authenticated (untrusted) querier/interviewer?  smiley? 
 
-# Handle different ports?
-#   - Before dropping into shell list working ports, offer ability to switch between (might want to query
-#   both global catologue and main domain ldap?  Think we should default to main since global has subset)
-
-# Built in GetUsers query (&(objectClass=user)(objectClass=person))
-#  - with ad username format, emails, description fields, etc
-#  - *** Need ability to translate UAC int/bitstring to human readable 
-#    * https://docs.microsoft.com/en-us/troubleshoot/windows-server/identity/useraccountcontrol-manipulate-account-properties
-#    * can probably just make list of these values, & with UAC value and see if that returns anything? 
 # Built in GetComputers query
-# Built in GetPasswordPolicy query
-# Built in Wildcard search for email type fields? 
+
+# *** Built in GetPasswordPolicy query
+# 	- is this actually a thing in ldap? 
+#   - this might be fairly reliably there in ad: search -filter (&(objectClass=domainDNS)(objectClass=domain)) / https://docs.microsoft.com/en-us/windows/win32/adschema/c-domaindns
+#   - but are the results legit?  says max 0 wrong guesses before lockout, can test but that seems innaccurate 
+#   - ms-DS-Password-Settings also seems good for win server < 2012
+# Built in Wildcard search for email type fields (this is really more of an attributes wildcard search I guess)? 
+
+# *** Built in SPN scanning (which boxes have sql server, mail server, etc) ***
+# 	- https://adsecurity.org/?p=2535#:~:text=obfuscated%20or%20hidden.-,Discover%20Enterprise%20Services%20without%20Network%20Scanning,-The%20simplest%20recon
+# 
+
+# *** Expand group or user func to describe relationship? ***
+# 	- I think it'll be clarifying the group id on users
+
+# *** Search needs to be able to handle spaces in rdns and filter value
+# 	- do \ to escape spaces?  probably not, seems like that might have particular meaning
+#     just split on full arg? 
 
 # Default to custom query
 # TODO: Better error handling / housekeeping
