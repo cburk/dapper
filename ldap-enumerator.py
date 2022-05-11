@@ -10,7 +10,6 @@ from code.src.consts import SSL_PORTS
 
 # TODO:
 # 3. Cleanup for github
-#   - *** Figure out error handling (currently it's just closing connection and continuing.  Should either raise and kill program or not close connection
 #   - Should we add a minimal option? (-m)
 #		* Could just be a small list of the one most important value (e.g. for users, just principalname)
 #       * also want consistency between output format of -v and default 
@@ -28,21 +27,10 @@ from code.src.consts import SSL_PORTS
 #   - ms-DS-Password-Settings also seems good for win server < 2012
 # Built in Wildcard search for email type fields (this is really more of an attributes wildcard search I guess)? 
 
-# *** Built in SPN scanning (which boxes have sql server, mail server, etc) ***
-# 	- https://adsecurity.org/?p=2535#:~:text=obfuscated%20or%20hidden.-,Discover%20Enterprise%20Services%20without%20Network%20Scanning,-The%20simplest%20recon
-# 
-
 # *** Expand group or user func to describe relationship? ***
 # 	- I think it'll be clarifying the group id on users
 
-# *** Search needs to be able to handle spaces in rdns and filter value
-# 	- do \ to escape spaces?  probably not, seems like that might have particular meaning
-#     just split on full arg? 
-
 # Default to custom query
-# TODO: Better error handling / housekeeping
-#   - calling unbind should disconnect everything
-#   - should do this if any exception thrown in shell
 # TODO: Connection via domain name vs ip?  Could make a difference? 
 # TODO: Multidomain scenarios we should consider? 
 #  - Like if user passes in hutch.pg, do we want to sometimes search DC=hutch, or just DC=hutch,DC=pg?

@@ -26,6 +26,43 @@ UAC_FLAGS = {
 	67108864: "PARTIAL_SECRETS_ACCOUNT"
 }
 
+# Should be case insensitive by default
+USEFUL_SPNS = [
+	"cifs",
+	"exchange",
+	"dns",
+	"ftp",
+	"http",
+	"imap",
+	"ipp",
+	"mongo",
+	"sql",
+	"kafka",
+	"pop",
+	"postgres",
+	"smtp",
+	"terms",
+	"vnc",
+	"vpn"
+]
+
+def is_common_spn(spn):
+	for useful_spn in USEFUL_SPNS:
+		if useful_spn in spn.lower():
+			return True
+	return False
+
+def get_common_spns_filter():
+	filt = "(|"
+	for spn in USEFUL_SPNS:
+		filt += f"(serviceprincipalname=*{spn}*)"
+	filt += ")"
+	return filt
+
+def get_all_with_spns_filter():
+	filt = "(serviceprincipalname=*)"
+	return filt
+
 def format_ldap_domain_components(domainName):
 	domains=domainName.split(".")
 	formatted_domains = [f"DC={x}" for x in domains]
@@ -54,6 +91,27 @@ def response_properties_subset(resjson, props):
 				newentry[prop] = val
 		formatted.append(newentry)
 	return formatted
+
+# Same structure as response_properties_subset, but with all entry properties (for verbose output with consistent formatting)
+def response_properties_all_formatted(resjson):
+	jsonentries = json.loads(resjson)["entries"]
+	formatted=[]
+	for entry in jsonentries:
+		attrs = entry["attributes"]
+		attrskeys = attrs.keys()
+		if "dn" in entry.keys():
+			newentry = {"dn": entry["dn"]}
+		else:
+			newentry = {}
+		for attr in attrskeys:
+			val = attrs[attr]			
+			if isinstance(val, list) and len(val) == 1: # LDAP library has lots of rules about when it returns one value or single element collections, condensing for readability
+				newentry[attr] = val[0]
+			else:
+				newentry[attr] = val
+		formatted.append(newentry)
+	return formatted
+
 
 def uac_bitstring_to_flags(uac):
 	flags = []

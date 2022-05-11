@@ -2,7 +2,7 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags
+from code.src.queryformatter import get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
 
 def find_args(argnames, stringinput):
 	indtoname = {}
@@ -96,10 +96,9 @@ class LDAPEnumShell(cmd.Cmd):
 		try:
 			# Handle shared args
 			if line:
-				components = line.split()
-				if "--outfile" in components:
-					outind = components.index("--outfile")	
-					if len(components) > outind + 1:
+				args = find_args(["-v","--outfile"],line)
+				if "--outfile" in args.keys():
+					if args["--outfile"] is not None and args["--outfile"]:
 						filename = components[outind+1]
 						print(f"Opening file {filename} to write output")
 						fd = open(filename,"w")
@@ -107,15 +106,18 @@ class LDAPEnumShell(cmd.Cmd):
 						self.filedescriptor=fd
 					else:
 						print(f"Error: Expected filename after --outfile")
+				if "-v" in args.keys():
+					self.verbose=True
+				else:
+					self.verbose=False					
 
 			return super().onecmd(line)
 		except ldap3.core.exceptions.LDAPSocketOpenError as e:
 			print(f"FAILURE: LDAPSocketOpenError {e.args} thrown attempting to query ldap, if \"invalid server address\" and base connection works, then domain name (or formatted domain components query string) is likely invalid")
 			self.cleanup()
-			return False
+			return True
 		except BaseException as e:
-			print(f"FAILURE: encountered {e}")
-			self.cleanup()
+			print(f"FAILURE: encountered {e}.  Keeping connection alive")
 			return False
 
 	def writeline(self, line):
@@ -127,6 +129,7 @@ class LDAPEnumShell(cmd.Cmd):
 		if self.filedescriptor is not None:
 			print(f"Closing {self.filedescriptor}")
 			self.filedescriptor=None
+
 		return stop
 
 	def do_enum_users(self, arg):
@@ -137,23 +140,22 @@ class LDAPEnumShell(cmd.Cmd):
 			search_scope='SUBTREE',
 			attributes='*')
 
-		components=[]
-		if arg and arg is not None:
-			components = arg.split()
-		if "-v" in components:
-			self.writeline(self.connection.entries)
+		res = self.connection.response_to_json()
+		
+		if self.verbose:
+			formattedentries = response_properties_all_formatted(res)
 		else:
-			res = self.connection.response_to_json()
 			formattedentries = response_properties_subset(res,["userAccountControl","sAMAccountName","userPrincipalName","description"])
-			for entry in formattedentries:
-				if "userAccountControl" in entry.keys():
-						uacbitstring = entry["userAccountControl"]
-						try:
-							entry["userAccountControlFormatted"] = uac_bitstring_to_flags(int(uacbitstring))
-						except ValueError:
-							print(f"Could not parse UAC: {uacbitstring}")
+		
+		for entry in formattedentries:
+			if "userAccountControl" in entry.keys():
+					uacbitstring = entry["userAccountControl"]
+					try:
+						entry["userAccountControlFormatted"] = uac_bitstring_to_flags(int(uacbitstring))
+					except ValueError:
+						print(f"Could not parse UAC: {uacbitstring}")
 
-			self.writeline(json.dumps(formattedentries, indent=4))
+		self.writeline(json.dumps(formattedentries, indent=4))
 				
 		# TODO: Clear entries after query?  
 
@@ -164,21 +166,83 @@ class LDAPEnumShell(cmd.Cmd):
 			search_scope='SUBTREE',
 			attributes='*')
 
-		components=[]
-		if arg and arg is not None:
-			components = arg.split()
-		if "-v" in components:
-			self.writeline(self.connection.entries)
+		res = self.connection.response_to_json()
+		
+		if self.verbose:
+			formattedentries = response_properties_all_formatted(res)
 		else:
-			res = self.connection.response_to_json()
-			#formattedentries = self.properties_subset(res,["name","objectSid","objectGUID"])
 			formattedentries = response_properties_subset(res,["name"])
-			self.writeline(json.dumps(formattedentries, indent=4))	
+		self.writeline(json.dumps(formattedentries, indent=4))	
 	
-	def do_enum_server_info(self, args):
+	def do_enum_service_spns(self, args):
+		'Looks for some common spns that indicate useful services.'
+		filt = get_common_spns_filter()
+		
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filt,
+			search_scope='SUBTREE',
+			attributes='*')
+		res = self.connection.response_to_json()
+
+		if self.verbose:
+			formattedentries = response_properties_all_formatted(res)
+		else:
+			formattedentries = response_properties_subset(res,["servicePrincipalName"])
+			for entry in formattedentries:
+				spns = entry["servicePrincipalName"]
+				if isinstance(spns,list):
+					interestingspns = []
+					for spn in spns:
+						if is_common_spn(spn):
+							interestingspns.append(spn)
+					entry["servicePrincipalName"] = interestingspns
+
+		self.writeline(json.dumps(formattedentries, indent=4))
+
+	def do_enum_service_accounts(self, args):
+		'Looks for some service accounts (with useful spns, unless -v specified, then any with spns).'
+		filt = get_common_spns_filter()
+		
+		if self.verbose:
+			filt = get_all_with_spns_filter()
+		
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filt,
+			search_scope='SUBTREE',
+			attributes='*')
+		
+		res = self.connection.response_to_json()
+		
+		if self.verbose:
+			formattedentries = response_properties_all_formatted(res)
+		else:			
+			formattedentries = response_properties_subset(res,["servicePrincipalName","description","sAMAccountName","objectClass"])
+			for entry in formattedentries:
+				spns = entry["servicePrincipalName"]
+				if isinstance(spns,list):
+					interestingspns = []
+					for spn in spns:
+						if is_common_spn(spn):
+							interestingspns.append(spn)
+					entry["servicePrincipalName"] = interestingspns
+					
+		# Determine which are group managed
+		for entry in formattedentries:
+			classestolower = [x.lower() for x in entry["objectClass"]]
+			if "msds-groupmanagedserviceaccount" in classestolower or "msds-managedserviceaccount" in classestolower:
+				entry["isManagedServiceAccount"] = True
+			else:
+				entry["isManagedServiceAccount"] = False
+			
+			if not self.verbose:
+				entry["objectClass"] = None
+
+		self.writeline(json.dumps(formattedentries, indent=4))
+			
+	def do_enum_server_info(self, arg):
 		'gets server info from DSE. '		
 
-		print(self.connection.server.info.__dict__)
+		
 		# useful (non verbose output):
 		# server.info.naming_contexts
 		# server.info.alt_servers
@@ -197,40 +261,29 @@ class LDAPEnumShell(cmd.Cmd):
 		else:
 			self.writeline(f"Connection returned no current user.  This is likely because authentication failed or wasn't attempted (i.e. this is an anonymous bind)")
 
-	def do_quit(self, args):
+			
+	def exit(self, args):
 		print("Exiting...")
-		self.cleanup()
+		
+		if "-f" in args:
+			try:
+				self.cleanup()
+			except:
+				return True
+		else:
+			self.cleanup()
+		
 		return True
+	
+	def do_quit(self, args):
+		'Exit the application.  -f to force (i.e. exit even if connection cleanup fails)'
+
+		return self.exit(args)
 
 	def do_exit(self, args):
-		print("Exiting...")
-		self.cleanup()
-		return True
-
-	def find_args(self, argnames, stringinput):
-		indtoname = {}
+		'Exit the application.  -f to force (i.e. exit even if connection cleanup fails)'
 		
-		for arg in argnames:
-			if arg in stringinput:
-				startind = stringinput.index(arg)
-				indtoname[startind] = arg
-				
-		keyvaluepairs = {}
-		indssorted = indtoname.keys().sort()
-		i = 0
-		for i in range(len(indssorted)):
-			argind = indssorted[i]
-			arg = indtoname[argind]
-			
-			valuestartind = argind + len(arg)
-			if i + 1 == len(indssorted):
-				valueendind = len(stringinput) - 1
-			else:
-				valueendind = indssorted[i+1] - 1
-			value = stringinput[valuestartind:valueendind]
-			print(f"{arg}:{value}")
-			keyvaluepairs[arg] = value
-		return keyvaluepairs
+		return self.exit(args)
 		
 	def do_search(self, arg):
 		'executes custom query under root context.\nflags are -rdns and -filter (e.g. -rdns ou=pwpolicies -filter x)'
@@ -248,12 +301,12 @@ class LDAPEnumShell(cmd.Cmd):
 		print(f"filter: {filt}")
 		print(f"dn: {dn}")
 					
-		#self.connection.search(search_base=dn,
-		#	search_filter=filt,
-		#	search_scope='SUBTREE',
-		#	attributes='*')
-#
-		#self.writeline(self.connection.entries)
+		self.connection.search(search_base=dn,
+			search_filter=filt,
+			search_scope='SUBTREE',
+			attributes='*')
+
+		self.writeline(self.connection.entries)
 
 	
 
