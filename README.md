@@ -16,7 +16,9 @@ Built for and tested on Kali Linux.
 
 ## Usage ##
 - Run `./ldap-enumerator.py -h` to see all parameters
-- Example usage: `ldap-enumerator.py -hostip 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
+- Example usage:
+    * `ldap-enumerator.py -hostip 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
+    * `ldap-enumerator.py -hostip 127.0.0.1`
 
 ## Testing ##
 - `./runtests.sh` will run existing tests.  
