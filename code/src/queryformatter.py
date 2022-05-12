@@ -67,7 +67,6 @@ def format_ldap_domain_components(domainName):
 	domains=domainName.split(".")
 	formatted_domains = [f"DC={x}" for x in domains]
 	ldapstr = ",".join(formatted_domains)
-	print(ldapstr)
 	return ldapstr
 
 # Return json representation of query response, with only a subset of each entry's properties (for legibility)

@@ -4,7 +4,7 @@ import ldap3
 from code.src.consts import SSL_PORTS
 
 
-SUPPORTED_SASL_AUTH_METHODS = ["DIGEST-MD5","whateverntlmis"]	
+SUPPORTED_SASL_AUTH_METHODS = ["DIGEST-MD5"]	
 
 def get_connection(hostip, port):
 
@@ -55,13 +55,12 @@ def get_authenticated_connection(hostip,realm,port,username,password,authenticat
 		c.bind()
 		return c
 	elif authentication_method ==  "DIGEST-MD5":
-		realm = args.hostdomain if args.hostdomain else None # None leads to use of server default realm 
-		# sounds like whatever user is probably fine
-		raise Exception("Not yet implemented (TODO)")
-	elif authentication_method == "whateverntlmis":
-		username="a" # TODO: Should we try to do this smart (i.e. mydomain.local,userA => mydomain\userA) or just trust users on format?  
-		# probably fine to just trust them, this should primarily be for unauth'd, after all.  maybe print warning if format isn't that of an AD user
-		raise Exception("Not yet implemented (TODO)")
+		realm = realm if realm else None # None leads to use of server default realm 
+		print(f"User:{username} --- Pass:{password} --- Realm: {realm}")
+		s = ldap3.Server(hostip, port=port,get_info=ldap3.ALL)
+		c = ldap3.Connection(s, auto_bind = True, version = 3, authentication = ldap3.SASL,
+                         sasl_mechanism = ldap3.DIGEST_MD5, sasl_credentials = (realm, username, password, None, 'sign'))
+		return c
 	else:
 		raise Exception(f"Unknown or unsupported authentication method {authentication_method}")	
 

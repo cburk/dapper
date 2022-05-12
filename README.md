@@ -11,6 +11,17 @@ In that spirit: I'm still learning LDAP and active directory concepts myself, so
 
 Built for and tested on Kali Linux.
 
+## Installation ##
+- Run `pip3 install ldap3`
+
+## Usage ##
+- Run `./ldap-enumerator.py -h` to see all parameters
+- Example usage: `ldap-enumerator.py -hostip 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
+
+## Testing ##
+- `./runtests.sh` will run existing tests.  
+- Note that messages like "FAILURE: encountered the JSON object must be str, bytes or bytearray, not MagicMock.  Keeping connection alive" aren't (necessarily) indications of a failing test, just poorly written tests.  Look for the "OK" at the end of each test section
+
 ## Disclaimers: ## 
 - This tool is intended for legitimate educational purposes only.
 - This tool is licensed under the Apache License, version 2.0 (see LICENSE).

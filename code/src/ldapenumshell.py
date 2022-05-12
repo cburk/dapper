@@ -27,7 +27,6 @@ def find_args(argnames, stringinput):
 			valueendind = indssorted[i+1] - 1
 		value = stringinput[valuestartind:valueendind]
 		value = value.lstrip().rstrip()
-		print(f"{arg}:{value}")
 		keyvaluepairs[arg] = value
 	return keyvaluepairs
 
@@ -132,6 +131,51 @@ class LDAPEnumShell(cmd.Cmd):
 
 		return stop
 
+	def do_enum_password_settings(self, arg):
+		'Look for common AD password settings (msDS-PasswordSettings, domainDNS, )'
+	
+		# msDS-PasswordSettings
+		self.writeline("===================================")
+		self.writeline("msDS-PasswordSettings	   ")
+		self.writeline("===================================")
+		filt = "(objectClass=msDS-PasswordSettings)"
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filt,
+			search_scope='SUBTREE',
+			attributes='*')
+		res = self.connection.response_to_json()
+		formattedentries = response_properties_all_formatted(res)
+
+		self.writeline(json.dumps(formattedentries, indent=4))
+
+		# domain dns
+		self.writeline("===================================")
+		self.writeline("DomainDNS			   ")
+		self.writeline("===================================")
+		filt = "(&(objectClass=domainDNS)(objectClass=domain))"
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filt,
+			search_scope='SUBTREE',
+			attributes='*')
+		res = self.connection.response_to_json()
+		formattedentries = response_properties_all_formatted(res)
+
+		self.writeline(json.dumps(formattedentries, indent=4))
+
+		
+		# CN=Password Settings Container
+		self.writeline("===================================")
+		self.writeline("Password Settings Container	   ")
+		self.writeline("===================================")
+		self.connection.search(search_base= "CN=Password Settings Container,CN=System," + self.domaincomponents,
+			search_filter="(objectClass=*)",
+			search_scope='SUBTREE',
+			attributes='*')
+		res = self.connection.response_to_json()
+		formattedentries = response_properties_all_formatted(res)
+
+		self.writeline(json.dumps(formattedentries, indent=4))
+		
 	def do_enum_users(self, arg):
 		'gets users'		
 		
@@ -145,7 +189,7 @@ class LDAPEnumShell(cmd.Cmd):
 		if self.verbose:
 			formattedentries = response_properties_all_formatted(res)
 		else:
-			formattedentries = response_properties_subset(res,["userAccountControl","sAMAccountName","userPrincipalName","description"])
+			formattedentries = response_properties_subset(res,["userAccountControl","sAMAccountName","userPrincipalName","description","memberOf"])
 		
 		for entry in formattedentries:
 			if "userAccountControl" in entry.keys():
@@ -171,9 +215,22 @@ class LDAPEnumShell(cmd.Cmd):
 		if self.verbose:
 			formattedentries = response_properties_all_formatted(res)
 		else:
-			formattedentries = response_properties_subset(res,["name"])
+			formattedentries = response_properties_subset(res,["name","member","memberOf"])
 		self.writeline(json.dumps(formattedentries, indent=4))	
 	
+	def do_enum_computers(self, arg):
+		dn = "CN=computers," + self.domaincomponents
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter='(objectClass=*)',
+			search_scope='SUBTREE',
+			attributes='*')
+
+		res = self.connection.response_to_json()
+		
+		formattedentries = response_properties_all_formatted(res)
+		self.writeline(json.dumps(formattedentries, indent=4))	
+
+		
 	def do_enum_service_spns(self, args):
 		'Looks for some common spns that indicate useful services.'
 		filt = get_common_spns_filter()
@@ -296,7 +353,8 @@ class LDAPEnumShell(cmd.Cmd):
 		if "-filter" in args.keys():
 			filt = args["-filter"]
 		if "-rdns" in args.keys():
-			dn += args["-rdns"]
+			rdns = args["-rdns"]
+			dn = args["-rdns"] + ("," if rdns[-1] != "," else "") + dn
 		
 		print(f"filter: {filt}")
 		print(f"dn: {dn}")
