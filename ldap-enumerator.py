@@ -8,21 +8,6 @@ from code.src.ldapenumshell import LDAPEnumShell
 from code.src.queryformatter import format_ldap_domain_components
 from code.src.consts import SSL_PORTS
 
-# TODO:
-# 3. Cleanup for github
-#   - Should we add a minimal option? (-m)
-#		* Could just be a small list of the one most important value (e.g. for users, just principalname)
-#       * also want consistency between output format of -v and default 
-#   - Improve unit tests
-#     * Accidentally broke naming context formatting in do_search, need some tests around that (or extract to formatters and test)
-#   - spellcheck lol? 
-
-# Built in GetComputers query
-
-# *** Built in Wildcard search for email type fields (this is really more of an attributes wildcard search I guess)? 
-# - Not wildcard I think, but how about these Contact types: https://adsecurity.org/?p=2535#:~:text=Identify%20Partner%20Organizations
-# - as well as just principalname
-
 parser = argparse.ArgumentParser(description='Pseudo shell to enumerate ldap')
 parser.add_argument('-hostip', type=str, required=True)
 parser.add_argument('-hostdomain', type=str)
@@ -35,7 +20,7 @@ successfulPorts=[]
 if try_connect(args.hostip,389):
 	successfulPorts.append(389)
 if try_connect(args.hostip,636):
-	successfulPorts.append(389)
+	successfulPorts.append(636)
 if try_connect(args.hostip,3268):
 	successfulPorts.append(3268)
 if try_connect(args.hostip,3269):
