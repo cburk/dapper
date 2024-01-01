@@ -12,7 +12,7 @@ In that spirit: I'm still learning LDAP and active directory concepts myself, so
 Built for and tested on Kali Linux.
 
 ## Installation ##
-- Run `pip3 install ldap3`
+- Run `pip install -r requirements.txt`
 
 ## Usage ##
 - Run `./ldap-enumerator.py -h` to see all parameters
