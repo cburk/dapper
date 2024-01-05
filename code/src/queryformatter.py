@@ -52,6 +52,9 @@ def is_common_spn(spn):
 			return True
 	return False
 
+def get_user_account_spns_filter():
+	return "(& (objectCategory=person) (servicePrincipalName=*))"
+
 def get_common_spns_filter():
 	filt = "(|"
 	for spn in USEFUL_SPNS:

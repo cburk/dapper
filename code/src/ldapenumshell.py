@@ -2,7 +2,7 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
+from code.src.queryformatter import get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
 
 def find_args(argnames, stringinput):
 	indtoname = {}
@@ -231,9 +231,15 @@ class LDAPEnumShell(cmd.Cmd):
 		self.writeline(json.dumps(formattedentries, indent=4))	
 
 		
-	def do_enum_service_spns(self, args):
-		'Looks for some common spns that indicate useful services.'
-		filt = get_common_spns_filter()
+	def do_enum_spns(self, args):
+		'Looks for some common spns that indicate useful services. -v for all spns, -user for only SPNs assigned to regular users (kerberoasting potentially feasible)'
+		
+		if self.verbose:
+			filt = get_all_with_spns_filter()
+		elif find_args(["-user"], args):
+			filt = get_user_account_spns_filter()
+		else:
+			filt = get_common_spns_filter()
 		
 		self.connection.search(search_base=self.domaincomponents,
 			search_filter=filt,

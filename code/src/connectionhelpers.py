@@ -21,14 +21,16 @@ def try_connect(hostip, port):
 
 	connection = ldap3.Connection(server)
 
+	failure_msg_abridged = ""
 	try:
 		connsucceeded = connection.bind()
-	except ldap3.core.exceptions.LDAPSocketOpenError:
+	except Exception as e:
 		connsucceeded=False
+		failure_msg_abridged = str(type(e))
 	
-	print(f"{port}: " + ("Connected successfully" if connsucceeded else "Failed to connect"))
+	print(f"{port}: " + ("Connected successfully" if connsucceeded else f"Failed to connect with: {failure_msg_abridged}"))
 
-	if not connection.closed:	
+	if connsucceeded and not connection.closed:	
 		connection.unbind()
 	return connsucceeded
 
