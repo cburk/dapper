@@ -9,16 +9,20 @@ My intention is to keep this tool light weight and compartmentalized.  This shou
 
 In that spirit: I'm still learning LDAP and active directory concepts myself, so if you see issues with my code or terminology please let me know!
 
-Built for and tested on Kali Linux.
+Client built for and tested on Kali Linux.
 
 ## Installation ##
 - Run `pip install -r requirements.txt`
 
 ## Usage ##
 - Run `./ldap-enumerator.py -h` to see all parameters
-- Example usage:
+- Example usage (shell):
     * `ldap-enumerator.py -hostip 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
     * `ldap-enumerator.py -hostip 127.0.0.1`
+    * see examples/connect.sh
+- Example usage (single command):
+    * `python ldap-enumerator.py -hostip 1.2.3.4 -username 'WINDOMAIN\vagrant' -password vagrant -command "enum_spns" -commandargs "-user --outfile tesout2.test"`
+    * see examples/single.sh
 
 ## Testing ##
 - `./runtests.sh` will run existing tests.  

@@ -98,7 +98,7 @@ class LDAPEnumShell(cmd.Cmd):
 				args = find_args(["-v","--outfile"],line)
 				if "--outfile" in args.keys():
 					if args["--outfile"] is not None and args["--outfile"]:
-						filename = components[outind+1]
+						filename = args["--outfile"]
 						print(f"Opening file {filename} to write output")
 						fd = open(filename,"w")
 						print(f"Using file descriptor {fd}")
