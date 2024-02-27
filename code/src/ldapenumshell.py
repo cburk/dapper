@@ -2,7 +2,7 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
+from code.src.queryformatter import get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
 
 def find_args(argnames, stringinput):
 	indtoname = {}
@@ -53,13 +53,14 @@ class LDAPEnumShell(cmd.Cmd):
 		print(self.common_args_description)
 		super().do_help(arg)
 
-	def __init__(self, hostip, hostdomain, port, username, password, create_connection):
+	def __init__(self, hostip, hostdomain, port, username, password, create_connection,logger):
 		self.hostip = hostip
 		self.hostdomain = hostdomain
 		self.port = port
 		self.username = username
 		self.password = password
-		print(f"trying {self.hostip}:{self.port}")
+		self.logger = logger
+		self.logger.print_debug(f"trying {self.hostip}:{self.port}")
 		self.connection = create_connection(hostip,hostdomain,port,username,password)
 		self.filedescriptor = None
 
@@ -69,15 +70,15 @@ class LDAPEnumShell(cmd.Cmd):
 		if hostdomain is None and serverdomaincomponents is None:
 			raise Exception("Could not format root domain components: domain argument not provided, server did not supply")
 		elif hostdomain is None:
-			print(f"Setting root naming context to server specified: {serverdomaincomponents}")
+			self.logger.print_debug(f"Setting root naming context to server specified: {serverdomaincomponents}")
 			self.domaincomponents=serverdomaincomponents
 		elif serverdomaincomponents is None:
 			hostdomaincomponents=format_ldap_domain_components(self.hostdomain)
-			print(f"Setting root naming context based on domain: {hostdomaincomponents}")
+			self.logger.print_debug(f"Setting root naming context based on domain: {hostdomaincomponents}")
 			self.domaincomponents=hostdomaincomponents
 		else:
 			hostdomaincomponents=format_ldap_domain_components(self.hostdomain)
-			print(f"Setting root naming context to server specified: {serverdomaincomponents} (vs domain {self.hostdomain} and {hostdomaincomponents})")
+			self.logger.print_debug(f"Setting root naming context to server specified: {serverdomaincomponents} (vs domain {self.hostdomain} and {hostdomaincomponents})")
 			self.domaincomponents=serverdomaincomponents
 
 		super().__init__()
@@ -98,7 +99,7 @@ class LDAPEnumShell(cmd.Cmd):
 				args = find_args(["-v","--outfile"],line)
 				if "--outfile" in args.keys():
 					if args["--outfile"] is not None and args["--outfile"]:
-						filename = components[outind+1]
+						filename = args["--outfile"]
 						print(f"Opening file {filename} to write output")
 						fd = open(filename,"w")
 						print(f"Using file descriptor {fd}")
@@ -120,9 +121,7 @@ class LDAPEnumShell(cmd.Cmd):
 			return False
 
 	def writeline(self, line):
-		print(line)
-		if self.filedescriptor is not None:
-			self.filedescriptor.write(str(line))
+		self.logger.print(line, self.filedescriptor)
 
 	def postcmd(self, stop,line):
 		if self.filedescriptor is not None:
@@ -197,7 +196,7 @@ class LDAPEnumShell(cmd.Cmd):
 					try:
 						entry["userAccountControlFormatted"] = uac_bitstring_to_flags(int(uacbitstring))
 					except ValueError:
-						print(f"Could not parse UAC: {uacbitstring}")
+						print(f"Error: Could not parse UAC: {uacbitstring}")
 
 		self.writeline(json.dumps(formattedentries, indent=4))
 				
@@ -231,9 +230,15 @@ class LDAPEnumShell(cmd.Cmd):
 		self.writeline(json.dumps(formattedentries, indent=4))	
 
 		
-	def do_enum_service_spns(self, args):
-		'Looks for some common spns that indicate useful services.'
-		filt = get_common_spns_filter()
+	def do_enum_spns(self, args):
+		'Looks for some common spns that indicate useful services. -v for all spns, -user for only SPNs assigned to regular users (kerberoasting potentially feasible)'
+		
+		if self.verbose:
+			filt = get_all_with_spns_filter()
+		elif find_args(["-user"], args):
+			filt = get_user_account_spns_filter()
+		else:
+			filt = get_common_spns_filter()
 		
 		self.connection.search(search_base=self.domaincomponents,
 			search_filter=filt,
@@ -356,8 +361,8 @@ class LDAPEnumShell(cmd.Cmd):
 			rdns = args["-rdns"]
 			dn = args["-rdns"] + ("," if rdns[-1] != "," else "") + dn
 		
-		print(f"filter: {filt}")
-		print(f"dn: {dn}")
+		self.logger.print_debug(f"filter: {filt}")
+		self.logger.print_debug(f"dn: {dn}")
 					
 		self.connection.search(search_base=dn,
 			search_filter=filt,
