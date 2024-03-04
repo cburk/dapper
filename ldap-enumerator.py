@@ -17,6 +17,7 @@ parser.add_argument('-username', type=str)
 parser.add_argument('-command', type=str, required=False, help="run single ldap-enumerator command as opposed to starting an interactive pseudo-shell (for ease of use w/ other command line utilities)")
 parser.add_argument('-commandargs', type=str, required=False, help="run single ldap-enumerator command as opposed to starting an interactive pseudo-shell (for ease of use w/ other command line utilities)")
 parser.add_argument('-debug', type=bool, required=False, default=False, help="Print additional debugging information (about auth, connection, args provided, etc)")
+parser.add_argument('-use-tgs', type=bool, required=False, default=False, help="Use the Service Ticket / TGS specified in the KRB5CCNAME env var to authenticate.  NOTE: if TGS is for an SPN other than the ldap service being authenticated to, will create and use a copy of the ccache w/ the spns set to the target ldap. sets the KRB5CCNAME env var as well")
 args = parser.parse_args()
 
 # optional debugging logging
