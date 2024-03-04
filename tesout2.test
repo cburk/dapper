@@ -1,0 +1,13 @@
+[
+    {
+        "dn": "CN=krbtgt,CN=Users,DC=windomain,DC=local",
+        "servicePrincipalName": "kadmin/changepw"
+    },
+    {
+        "dn": "CN=Steve SQL,CN=Users,DC=windomain,DC=local",
+        "servicePrincipalName": [
+            "MSSQLSvc/wef.windomain.local:1433",
+            "MSSQLSvc/WEF:1433"
+        ]
+    }
+]

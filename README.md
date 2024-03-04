@@ -17,12 +17,29 @@ Client built for and tested on Kali Linux.
 ## Usage ##
 - Run `./ldap-enumerator.py -h` to see all parameters
 - Example usage (shell):
-    * `ldap-enumerator.py -hostip 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
-    * `ldap-enumerator.py -hostip 127.0.0.1`
+    * `ldap-enumerator.py -ldaphost 127.0.0.1 -hostdomain example.com -username auser@example.com -password mypass1`
+    * `ldap-enumerator.py -ldaphost 127.0.0.1`
     * see examples/connect.sh
 - Example usage (single command):
-    * `python ldap-enumerator.py -hostip 1.2.3.4 -username 'WINDOMAIN\vagrant' -password vagrant -command "enum_spns" -commandargs "-user --outfile tesout2.test"`
+    * `python ldap-enumerator.py -ldaphost 1.2.3.4 -username 'WINDOMAIN\vagrant' -password vagrant -command "enum_spns" -commandargs "-user --outfile tesout2.test"`
     * see examples/single.sh
+- Example usage (authenticating with pre-existing TGS, e.g. from impacket Get-ST):
+    * TODO
+    * `python ldap-enumerator.py -ldaphost `
+
+## Authentication behavior ##
+- Default behavior is to authenticate via ntlm w/ provided -username and -password
+- If no -password is provided but -ntlmhash parameter is, will try to authenticate via ntlm with the hash
+- If no -password is provided but the KRB5CCNAME env var points to a valid ccache file and -use-tgs is provided, will try to authenticate using kerberos auth
+  * Note: if the CCache provided contains a service ticket (ST/TGS) and kerberos based auth fails, dapper will create a copy w/ the spn changed to the appropriate one for this service and set the KRB5CCNAME to that, so that we can use a captured TGS for another service run under the same service account.  For an explanation of why this works, see: https://www.secureauth.com/blog/kerberos-delegation-spns-and-more/
+- If none fo the above work, will attempt an anonymous bind 
+
+- ***TODO: Test bad creds scenario w/ raise_exception as per https://ldap3.readthedocs.io/en/latest/bind.html#bind-as-a-different-user-while-the-connection-is-open
+
+- ***TODO: ntlm relay scenario, anon connection to server through the proxy? 
+
+- ***TODO: update requirements.txt, note gssapi install requirements
+
 
 ## Testing ##
 - `./runtests.sh` will run existing tests.  

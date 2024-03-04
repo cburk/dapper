@@ -1,8 +1,6 @@
 from gssapi import creds
-
 import gssapi.raw as gr
 from impacket.krb5 import ccache, types
-import json
 import os
 
 

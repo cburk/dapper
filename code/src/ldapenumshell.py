@@ -53,15 +53,10 @@ class LDAPEnumShell(cmd.Cmd):
 		print(self.common_args_description)
 		super().do_help(arg)
 
-	def __init__(self, hostip, hostdomain, port, username, password, create_connection,logger):
-		self.hostip = hostip
+	def __init__(self, hostdomain, connection,logger):
 		self.hostdomain = hostdomain
-		self.port = port
-		self.username = username
-		self.password = password
 		self.logger = logger
-		self.logger.print_debug(f"trying {self.hostip}:{self.port}")
-		self.connection = create_connection(hostip,hostdomain,port,username,password)
+		self.connection = connection
 		self.filedescriptor = None
 
 		# Note: As I understand it, the root naming context isn't always a function of the domain name.

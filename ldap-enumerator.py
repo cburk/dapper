@@ -10,14 +10,16 @@ from code.src.consts import SSL_PORTS
 from code.src.logger import FileMuxLogger
 
 parser = argparse.ArgumentParser(description='Pseudo shell to enumerate ldap')
-parser.add_argument('-hostip', type=str, required=True)
+parser.add_argument('-ldaphost', type=str, required=True, help="hostname or ip of the ldap service to run against")
 parser.add_argument('-hostdomain', type=str)
+parser.add_argument('-port', type=int, required=False, help="Port to use.  If not specified, will try to connect to all main ldap and ldaps ports")
 parser.add_argument('-password', type=str)
 parser.add_argument('-username', type=str)
 parser.add_argument('-command', type=str, required=False, help="run single ldap-enumerator command as opposed to starting an interactive pseudo-shell (for ease of use w/ other command line utilities)")
 parser.add_argument('-commandargs', type=str, required=False, help="run single ldap-enumerator command as opposed to starting an interactive pseudo-shell (for ease of use w/ other command line utilities)")
 parser.add_argument('-debug', type=bool, required=False, default=False, help="Print additional debugging information (about auth, connection, args provided, etc)")
 parser.add_argument('-use-tgs', type=bool, required=False, default=False, help="Use the Service Ticket / TGS specified in the KRB5CCNAME env var to authenticate.  NOTE: if TGS is for an SPN other than the ldap service being authenticated to, will create and use a copy of the ccache w/ the spns set to the target ldap. sets the KRB5CCNAME env var as well")
+parser.add_argument('-ntlmhash', type=str, required=False, help="The ntlm hash to use in lieu of a password")
 args = parser.parse_args()
 
 # optional debugging logging
@@ -26,71 +28,66 @@ args = parser.parse_args()
 # OSCP prep working on the code
 logger = FileMuxLogger(args.debug)
 
-successfulPorts=[]
-# Trying anonymous connection
-if try_connect(args.hostip,389,logger):
-	successfulPorts.append(389)
-if try_connect(args.hostip,636,logger):
-	successfulPorts.append(636)
-if try_connect(args.hostip,3268,logger):
-	successfulPorts.append(3268)
-if try_connect(args.hostip,3269,logger):
-	successfulPorts.append(3269)
+def try_authenticate(ldaphost,realm,port,username,password,ntlmhash,usekerb):
+	# attempt ntlm auth
+	if (username and username is not None) and (password and password is not None):
+		res = try_get_authenticated_connection(ldaphost,realm,port,username,password,"NTLM",logger)
+		if res[0]:
+			logger.print_debug(f"Authenticated connection - SUCCESS: NTLM")
+			return (True,res[1])
+		logger.print_debug("Could not bind with authentication method NTLM, proceeding...")
 
-def try_authenticate(hostip,realm,port,username,password,server_supported_sasl_authentication_methods):
-	if (not username or username is None) or (not password or password is None):
-		return (False,None)
+	if (username and username is not None) and (ntlmhash and ntlmhash is not None):
+		res = try_get_authenticated_connection(ldaphost,realm,port,username,ntlmhash,"NTLM",logger)
+			logger.print_debug(f"Authenticated connection - SUCCESS: NTLM (hash)")
+			return (True,res[1])
+		logger.print_debug("Could not bind with authentication method NTLM, proceeding...")	
+	
+	if (username and username is not None) and usekerb:
+		res = try_get_authenticated_connection(ldaphost,realm,port,username,None,"Kerberos",logger)
+			logger.print_debug(f"Authenticated connection - SUCCESS: NTLM (hash)")
+			return (True,res[1])
+		logger.print_debug("Could not bind with authentication method NTLM, proceeding...")	
 
-	# Try simple authentication first
-	if try_get_authenticated_connection(hostip,realm,port,username,password,"SIMPLE",logger):
-		logger.print_debug(f"Authenticated connection - SUCCESS: SIMPLE")
-		return (True,"SIMPLE")
-	logger.print_debug("Could not bind with authentication method SIMPLE, proceeding...")
-
-	# Try SASL methods next 
-	# Treat None in server auth methods as any, since it could mean server isn't configured to return these values (for anonymous)
-	viable_sasl_auth_methods = SUPPORTED_SASL_AUTH_METHODS if server_supported_sasl_authentication_methods == None else set(SUPPORTED_SASL_AUTH_METHODS).intersection(server_supported_sasl_authentication_methods) 
-	if len(viable_sasl_auth_methods) == 0: 
-		logger.print_debug(f"Authenticated connection - FAILURE: simple authentication failed, tool does not support {viable_sasl_auth_methods}")
-
-	# If initial auth failed, could be because simple is unsupported, or because creds are invalid.  
-	# Prompt user about trying other to avoid lockouts
-	for auth_method in viable_sasl_auth_methods:
-		val = input(f"Try with authentication method {auth_method}? (Y/N)")
-		if val.lower() == "y":
-			success=try_get_authenticated_connection(hostip,realm,port,username,password,auth_method,logger)
-			if success:
-				logger.print_debug(f"Authenticated connection - SUCCESS: {auth_method}")
-				return (True,auth_method)
-			else:
-				logger.print_debug(f"Could not bind with authentication method {auth_method}, proceeding...")
-
-	logger.print_debug(f"Authenticated connection - FAILURE: all mutually supported SASL authentication methods failed")
+	logger.print_debug(f"Authenticated connection - FAILURE: all methods failed or not enough information provided to authenticate")
 	return (False,None)
 
-if len(successfulPorts) > 0:
-	currentPort=successfulPorts[0]
-	logger.print_debug(f"Anonymous connection - SUCCESS: {len(successfulPorts)} working ports found, using {currentPort}")
+	# TODO: Are we doing LDAPS correctly?  proper tls code?
 
-	server_supports=get_server_supported_sasl_authentication_methods(args.hostip,currentPort,logger)
+	# TODO: Support ntlm here: https://ldap3.readthedocs.io/en/latest/bind.html#ntlm
 
-	res=try_authenticate(args.hostip, args.hostdomain, currentPort, args.username, args.password, server_supports)
-	if res[0] == True:
-		logger.print_debug(f"Authenticated connection - SUCCESS: {args.username}:{args.password} at {args.hostip}:{currentPort}")
-		connection_constructor = lambda ip,host,port,user,password:  get_authenticated_connection(ip,host,port,user,password,res[1],logger)
-	else:
-		logger.print_debug(f"Authenticated connection - FAILURE: {args.username}:{args.password} at {args.hostip}:{currentPort}")
-		connection_constructor = lambda ip,host,port,user,password: get_connection(ip,port)
+def try_port(port):
+	res = try_authenticate(args.ldaphost, args.hostdomain, port, args.username, args.password, args.ntlmhash, args.use-tgs)
+	if res[0]:
+		return (True, res[1])
+	# Trying anonymous bind
+	res = try_connect(args.ldaphost,389,logger)
+	if res[0]:
+		return (True, res[1])
+	return (False, None)
 
+ports = []
+if args.port is None:
+	ports = [389,636,3268,3269]
+else:
+	ports = [args.port]
+
+lastConnection = (False,None)
+for port in ports:
+	lastConnection = try_port(port)
+	if lastConnection[0]:
+		logger.print_debug(f"Connection - SUCCESS: {port}")
+
+if lastConnection[0]:
 	if args.command:
 		logger.print_debug(f"Running command {args.command} {args.commandargs}")
 		# Note: cleaner approach would probably be 2 separate shell & individual command runner classes w/ mediator in b/w them and abstracted command handlers
 		# this should work as a v1 though
-		runner = LDAPEnumShell(args.hostip, args.hostdomain, currentPort, args.username, args.password, connection_constructor, logger)
+		runner = LDAPEnumShell(args.hostdomain, lastConnection[1], logger)
 		runner.onecmd(f"{args.command}{args.commandargs}")
 	else:
 		logger.print_debug("Starting pseudo-shell...")
-		LDAPEnumShell(args.hostip, args.hostdomain, currentPort, args.username, args.password, connection_constructor, logger).cmdloop()
+		LDAPEnumShell(args.hostdomain, lastConnection[1], logger).cmdloop()
 else:
 	logger.print_debug(f"FAILURE: Could not successfully connect to any ports")
 
