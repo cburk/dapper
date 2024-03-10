@@ -30,7 +30,7 @@ Client built for and tested on Kali Linux.
 ## Authentication behavior ##
 - Default behavior is to authenticate via ntlm w/ provided -username and -password
 - If no -password is provided but -ntlmhash parameter is, will try to authenticate via ntlm with the hash
-- If no -password is provided but the KRB5CCNAME env var points to a valid ccache file and -use-tgs is provided, will try to authenticate using kerberos auth
+- If no -password is provided but the KRB5CCNAME env var points to a valid ccache file and -usetgs is provided, will try to authenticate using kerberos auth
   * Note: if the CCache provided contains a service ticket (ST/TGS) and kerberos based auth fails, dapper will create a copy w/ the spn changed to the appropriate one for this service and set the KRB5CCNAME to that, so that we can use a captured TGS for another service run under the same service account.  For an explanation of why this works, see: https://www.secureauth.com/blog/kerberos-delegation-spns-and-more/
 - If none fo the above work, will attempt an anonymous bind 
 
