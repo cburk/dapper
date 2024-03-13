@@ -118,7 +118,7 @@ def get_authenticated_connection(ldaphost,realm,port,username,password,authentic
 		# Imports here so users who do't need kerb auth do't have to configure gssapi
 		import gssapi
 		import gssapi.raw as gr
-		tls = None 
+		tls = None
 		if port in SSL_PORTS:
 			tls = ldap3.Tls(validate=ssl.CERT_NONE, version=ssl.PROTOCOL_TLSv1_2)
 
