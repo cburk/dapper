@@ -13,6 +13,10 @@ Client built for and tested on Kali Linux.
 
 ## Installation ##
 - Run `pip install -r requirements.txt`
+  * To use the kerberos ST/TGS functionality on linux, install MIT KRB5 abd  
+    - sudo apt install libkrb5-dev
+    - pip install gssapi (used version 1.8.3)
+    - see https://stackoverflow.com/questions/30896343/how-to-install-gssapi-python-module for more context 
 
 ## Usage ##
 - Run `./ldap-enumerator.py -h` to see all parameters
@@ -24,8 +28,7 @@ Client built for and tested on Kali Linux.
     * `python ldap-enumerator.py -ldaphost 1.2.3.4 -username 'WINDOMAIN\vagrant' -password vagrant -command "enum_spns" -commandargs "-user --outfile tesout2.test"`
     * see examples/single.sh
 - Example usage (authenticating with pre-existing TGS, e.g. from impacket Get-ST):
-    * TODO
-    * `python ldap-enumerator.py -ldaphost `
+    * `KRB5CCNAME=./admin-ldap-tgs.ccache python ldap-enumerator.py -debug True -ldaphost dc.windomain.local -port 636 -usetgs True -hostdomain WINDOMAIN.LOCAL`
 
 ## Authentication behavior ##
 - Default behavior is to authenticate via ntlm w/ provided -username and -password
@@ -37,9 +40,6 @@ Client built for and tested on Kali Linux.
 - ***TODO: Test bad creds scenario w/ raise_exception as per https://ldap3.readthedocs.io/en/latest/bind.html#bind-as-a-different-user-while-the-connection-is-open
 
 - ***TODO: ntlm relay scenario, anon connection to server through the proxy? 
-
-- ***TODO: update requirements.txt, note gssapi install requirements
-
 
 ## Testing ##
 - `./runtests.sh` will run existing tests.  
