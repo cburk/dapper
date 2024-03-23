@@ -111,7 +111,7 @@ def get_authenticated_connection(ldaphost,realm,port,username,password,authentic
 
 		s = ldap3.Server(ldaphost, port=port, use_ssl = (port in SSL_PORTS), tls=tls, get_info=ldap3.ALL)
 		#s = ldap3.Server(ldaphost, port=port, get_info=ldap3.ALL)
-		c = ldap3.Connection(s, user=username, password=password, authentication=ldap3.NTLM)
+		c = ldap3.Connection(s, user=username, password=password, authentication=ldap3.NTLM, raise_exceptions=True)
 		c.bind()
 		return c
 	elif authentication_method == "Kerberos":

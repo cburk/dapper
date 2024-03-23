@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 import json
+from impacket.ldap import ldaptypes
+from ldap3 import MODIFY_REPLACE,MODIFY_ADD
+import base64
 
 UAC_FLAGS = {
 	1: "SCRIPT",
@@ -52,6 +55,12 @@ def is_common_spn(spn):
 			return True
 	return False
 
+def get_users_filter(nameLike = ''):
+	base = "(&(objectClass=user)(objectClass=person))"
+	if nameLike != '':
+		base = f"(& (userPrincipalName=*{nameLike}*) {base})"
+	return base
+
 def get_user_account_spns_filter():
 	return "(& (objectCategory=person) (servicePrincipalName=*))"
 
@@ -65,6 +74,14 @@ def get_common_spns_filter():
 def get_all_with_spns_filter():
 	filt = "(serviceprincipalname=*)"
 	return filt
+
+def get_object_with_sid_filter(sid):
+	filt = f"(objectSid={sid})"
+	return filt
+
+def append_msds_allowedtodelegateto(spn):
+	command = { "msDS-AllowedToDelegateTo": [(MODIFY_ADD, [spn])] }
+	return command
 
 def format_ldap_domain_components(domainName):
 	domains=domainName.split(".")
@@ -121,3 +138,19 @@ def uac_bitstring_to_flags(uac):
 		if key & uac == key:
 			flags.append(UAC_FLAGS[key])
 	return flags
+
+def parse_security_descriptor(b64_ntsecuritydescriptor):
+	# secDesc = ldaptypes.SR_SECURITY_DESCRIPTOR()
+	# secDesc.fromString(b64_ntsecuritydescriptor)
+	# print(str(secDesc))
+
+	# TODO: Almost perfect example of what I'm doing: https://github.com/the-useless-one/pywerview/blob/71e70889347f726dd9f9ba15f0d953bba07b9bd8/pywerview/functions/net.py#L68C1-L69C1
+	print("START")
+	print(b64_ntsecuritydescriptor)
+	secDesc2 = ldaptypes.SR_SECURITY_DESCRIPTOR()
+	#secDesc2.fromString(b64_ntsecuritydescriptor.values[0].decode("UTF-8"))
+	secDesc2.fromString(base64.b64decode(b64_ntsecuritydescriptor))
+	print(type(secDesc2['OwnerSid']))
+	print(secDesc2['OwnerSid'].formatCanonical()) # Works!  Just need way to display
+	print("END")
+

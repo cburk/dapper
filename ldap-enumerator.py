@@ -20,6 +20,7 @@ parser.add_argument('-commandargs', type=str, required=False, help="run single l
 parser.add_argument('-debug', type=bool, required=False, default=False, help="Print additional debugging information (about auth, connection, args provided, etc)")
 parser.add_argument('-usetgs', type=bool, required=False, default=False, help="Use the Service Ticket / TGS specified in the KRB5CCNAME env var to authenticate.  NOTE: if TGS is for an SPN other than the ldap service being authenticated to, will create and use a copy of the ccache w/ the spns set to the target ldap. sets the KRB5CCNAME env var as well")
 parser.add_argument('-ntlmhash', type=str, required=False, help="The ntlm hash to use in lieu of a password")
+parser.add_argument('-tryanonymous', type=bool, required=False, default=True, help="If authentication isn't attempted or doesn't succeed, try anonymous bind")
 args = parser.parse_args()
 
 # optional debugging logging
@@ -64,10 +65,11 @@ def try_port(port):
 		logger.print_debug(f"Successful authenticated connection to {port}, returning")
 		return (True, res[1])
 	# Trying anonymous bind
-	res = try_connect(args.ldaphost,port,logger)
-	if res[0]:
-		logger.print_debug(f"Successful unauthenticated connection to {port}, returning")
-		return (True, res[1])
+	if args.tryanonymous:
+		res = try_connect(args.ldaphost,port,logger)
+		if res[0]:
+			logger.print_debug(f"Successful unauthenticated connection to {port}, returning")
+			return (True, res[1])
 	logger.print_debug(f"Unsuccessful connecting to {port}, returning")
 	return (False, None)
 

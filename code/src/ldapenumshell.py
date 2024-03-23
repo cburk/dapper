@@ -2,7 +2,7 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn
+from code.src.queryformatter import parse_security_descriptor,get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn,get_users_filter,get_object_with_sid_filter,append_msds_allowedtodelegateto
 
 def find_args(argnames, stringinput):
 	indtoname = {}
@@ -170,11 +170,19 @@ class LDAPEnumShell(cmd.Cmd):
 
 		self.writeline(json.dumps(formattedentries, indent=4))
 		
-	def do_enum_users(self, arg):
-		'gets users'		
+	def do_enum_users(self, args):
+		'gets users.  if -like NAME is passed, looks for users with similar principal names'		
 		
+		argsparsed = find_args(["-like"], args)
+		if argsparsed:
+			filter = get_users_filter(argsparsed["-like"])
+		else:
+			filter = get_users_filter()
+		if self.verbose:
+			self.writeline(f"Query: {filter}")
+
 		self.connection.search(search_base=self.domaincomponents,
-			search_filter='(&(objectClass=user)(objectClass=person))',
+			search_filter=filter,
 			search_scope='SUBTREE',
 			attributes='*')
 
@@ -193,9 +201,23 @@ class LDAPEnumShell(cmd.Cmd):
 					except ValueError:
 						print(f"Error: Could not parse UAC: {uacbitstring}")
 
+		# TODO: Figure out the logging situation, really need 2 self.writelines (one for debug level, one for normal)
+		# e.g. printing filter is a debug level log, -verbose should just add the additional properties
 		self.writeline(json.dumps(formattedentries, indent=4))
 				
 		# TODO: Clear entries after query?  
+
+	def do_enum_groupsandusers2(self, arg):
+		self.connection.search(search_base=self.domaincomponents,
+		search_filter='(objectClass=*)',
+		search_scope='SUBTREE',
+		attributes=['CN','ACL'])
+		print(self.connection.response_to_json())
+		print("==============================\n\n")
+		print("Starting Entries parsing\n\n")
+		print("==============================\n\n")
+		for e in self.connection.entries:
+			print(e.entry_to_json())
 
 	def do_enum_groups(self, arg):
 		'gets groups'		
@@ -215,14 +237,27 @@ class LDAPEnumShell(cmd.Cmd):
 	def do_enum_computers(self, arg):
 		dn = "CN=computers," + self.domaincomponents
 		self.connection.search(search_base=self.domaincomponents,
-			search_filter='(objectClass=*)',
+			search_filter='(objectclass=computer)',
 			search_scope='SUBTREE',
-			attributes='*')
+			attributes=[ldap3.ALL_ATTRIBUTES, 'nTSecurityDescriptor'])
 
 		res = self.connection.response_to_json()
 		
 		formattedentries = response_properties_all_formatted(res)
 		self.writeline(json.dumps(formattedentries, indent=4))	
+		
+		
+		print("==============================\n\n")
+		print("Starting Entries parsing\n\n")
+		print("==============================\n\n")
+		for e in self.connection.entries:
+			#print(e.entry_to_json())
+			p = json.loads(e.entry_to_json())
+			print(p)
+			print("Secd: " + p["attributes"]["nTSecurityDescriptor"][0]["encoded"])
+			print("Change")
+			parse_security_descriptor(p["attributes"]["nTSecurityDescriptor"][0]["encoded"])
+			#parse_security_descriptor(e.ntSecurityDescriptor)
 
 		
 	def do_enum_spns(self, args):
@@ -296,6 +331,45 @@ class LDAPEnumShell(cmd.Cmd):
 
 		self.writeline(json.dumps(formattedentries, indent=4))
 			
+	def do_write_msDS_AllowedToDelegateTo(self, args):
+		'write -spn spn to the msDS-AllowedToDelegateTo attribute of object w/ sid=-sid'
+
+		argsparsed = find_args(["-spn","-sid"], args)
+		spn = argsparsed["-spn"]
+		sid = argsparsed["-sid"]
+		self.writeline(f"Adding {spn} to entity w/ sid {sid}") #debug level
+
+		filter = get_object_with_sid_filter(sid)
+		self.writeline(f"search w/ filter {filter}") #debug level
+
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filter,
+			search_scope='SUBTREE',
+			attributes='*')
+		
+		res = self.connection.response_to_json()
+		formattedentries = response_properties_subset(res,["distinguishedName","msDS-AllowedToDelegateTo"])
+		if len(formattedentries) == 0:
+			self.writeline(f"lookup for sid {sid} failed") #error log
+			return
+		dn = formattedentries[0]["distinguishedName"]
+		self.writeline(f"Found entity w/ sid {sid} and distinguishedName: {dn}.") # debug level
+		old = formattedentries[0]["msDS-AllowedToDelegateTo"]
+		self.writeline(f"{sid} previous msDs-AllowedToDelegateTo: {old}.") # normal level?
+		
+		updatecommand = append_msds_allowedtodelegateto(spn)
+		self.connection.modify(dn,updatecommand)
+
+		self.connection.search(search_base=self.domaincomponents,
+			search_filter=filter,
+			search_scope='SUBTREE',
+			attributes='*')
+		res = self.connection.response_to_json()
+		formattedentries = response_properties_subset(res,["msDS-AllowedToDelegateTo"])
+		new = formattedentries[0]["msDS-AllowedToDelegateTo"]
+		self.writeline(f"{sid} updated msDs-AllowedToDelegateTo: {new}.") # normal level?
+
+
 	def do_enum_server_info(self, arg):
 		'gets server info from DSE. '		
 
