@@ -11,6 +11,8 @@ In that spirit: I'm still learning LDAP and active directory concepts myself, so
 
 Client built for and tested on Kali Linux.
 
+Thanks to everyone who created Impacket, I borrowed heavily from that when writing this
+
 ## Installation ##
 - Run `pip install -r requirements.txt`
   * To use the kerberos ST/TGS functionality on linux, install MIT KRB5 abd  

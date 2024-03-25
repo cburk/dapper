@@ -2,34 +2,16 @@
 import ldap3
 import cmd, sys, os, json
 from code.src.connectionhelpers import try_connect,get_connection
-from code.src.queryformatter import parse_security_descriptor,get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn,get_users_filter,get_object_with_sid_filter,append_msds_allowedtodelegateto
+from code.src.queryformatter import UAC_FLAG_DESCRS_TO_FLAGS,UAC_FLAGS,parse_security_descriptor,get_user_account_spns_filter,get_all_with_spns_filter,response_properties_all_formatted,format_ldap_domain_components,response_properties_subset,uac_bitstring_to_flags,get_common_spns_filter,is_common_spn,get_users_filter
+from code.src.shellargumentparser import find_args, find_args_allowduplicates
 
-def find_args(argnames, stringinput):
-	indtoname = {}
-
-	for arg in argnames:
-		if arg in stringinput:
-			startind = stringinput.index(arg)
-			indtoname[startind] = arg
-			
-	keyvaluepairs = {}
-	indssorted = list(indtoname.keys())
-	indssorted.sort()
-	i = 0
-	for i in range(len(indssorted)):
-		argind = indssorted[i]
-		arg = indtoname[argind]
-
-		valuestartind = argind + len(arg)
-		if i + 1 == len(indssorted):
-			valueendind = len(stringinput)
-		else:
-			valueendind = indssorted[i+1] - 1
-		value = stringinput[valuestartind:valueendind]
-		value = value.lstrip().rstrip()
-		keyvaluepairs[arg] = value
-	return keyvaluepairs
-
+# Command handler pattern
+from code.src.CommandHandlers.CommandMediator import CommandMediator
+from code.src.Commands.writeMsDSAllowedToActOnBehalfOfOtherIdentityCommand import writeMsDSAllowedToActOnBehalfOfOtherIdentityCommand
+from code.src.Commands.writeMsDSAllowedToDelegateToCommand import writeMsDSAllowedToDelegateToCommand
+from code.src.Commands.writeUacFlagsCommand import writeUacFlagsCommand
+from code.src.Commands.writeSPNToUserCommand import writeSPNToUserCommand
+from code.src.Commands.writeUserToGroupCommand import writeUserToGroupCommand
 
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
@@ -58,6 +40,7 @@ class LDAPEnumShell(cmd.Cmd):
 		self.logger = logger
 		self.connection = connection
 		self.filedescriptor = None
+		self.mediator = CommandMediator()
 
 		# Note: As I understand it, the root naming context isn't always a function of the domain name.
 		# But, since this tool is primarily designed for use against AD, and to simplify for users who don't yet know the domain, I'm adding this as an option 
@@ -331,6 +314,50 @@ class LDAPEnumShell(cmd.Cmd):
 
 		self.writeline(json.dumps(formattedentries, indent=4))
 			
+	def help_write_uac_flags(self):
+		print(f'Set or unset uac flags for entity specified by -sid.  -set <flag> to flip on, -unset <flag> to flip off (multiples allowed).  Flags can be specified w/ the integer value of the mask (e.g. 524288 for TrustedForDelegation) or one of these string representations (sans quotes): {UAC_FLAG_DESCRS_TO_FLAGS.keys()}')
+	def do_write_uac_flags(self,args):
+		argsparsed = find_args_allowduplicates(["-sid","-set","-unset"],args)
+		if "-sid" in argsparsed.keys():
+			entitysid = argsparsed["-sid"][0]
+			sets = []
+			unsets = []
+			if "-set" in argsparsed.keys():
+				for setflag in argsparsed["-set"]:
+					sets.append(UAC_FLAGS[int(setflag)] if setflag.isdecimal() else setflag)
+			if "-unset" in argsparsed.keys():
+				for unsetflag in argsparsed["-unset"]:
+					unsets.append(UAC_FLAGS[int(unsetflag)] if unsetflag.isdecimal() else unsetflag)
+
+			command = writeUacFlagsCommand(entitysid, sets, unsets)
+			self.mediator.handle(command, self.connection, self.domaincomponents)
+		else:
+			print("ERROR: no -sid passed") # Error log
+
+	def do_write_spn_to_user(self, args):
+		'create spn -spn for user w/ sid=-sid'
+		argsparsed = find_args_allowduplicates(["-sid","-spn"], args)
+		if "-sid" in argsparsed.keys():
+			entitysid = argsparsed["-sid"][0]
+			command = writeSPNToUserCommand(entitysid, argsparsed["-spn"])
+			self.mediator.handle(command, self.connection, self.domaincomponents)
+		else:
+			print("ERROR: no -sid passed") # Error log
+
+	def do_write_user_to_group(self, args):
+		'write -TODO to group -TODO w/ TODO format for ids you get it'
+		argsparsed = find_args(["-TODO","-victimsid"], args)
+		# TODO: Any printing or post-proc
+
+	def do_write_msDS_AllowedToActOnBehalfOfOtherIdentity(self, args):
+		'write -valuesid sid to the msDS-AllowedToActOnBehalf... attribute of object w/ sid=-victimsid'
+		argsparsed = find_args(["-valuesid","-victimsid"], args)
+		valuesid = argsparsed["-valuesid"]
+		victimsid = argsparsed["-victimsid"]
+		cmd = writeMsDSAllowedToActOnBehalfOfOtherIdentityCommand(victimsid, valuesid)
+		self.mediator.handle(cmd, self.connection, self.domaincomponents)
+		# TODO: Any printing or post-proc
+
 	def do_write_msDS_AllowedToDelegateTo(self, args):
 		'write -spn spn to the msDS-AllowedToDelegateTo attribute of object w/ sid=-sid'
 
@@ -339,36 +366,8 @@ class LDAPEnumShell(cmd.Cmd):
 		sid = argsparsed["-sid"]
 		self.writeline(f"Adding {spn} to entity w/ sid {sid}") #debug level
 
-		filter = get_object_with_sid_filter(sid)
-		self.writeline(f"search w/ filter {filter}") #debug level
-
-		self.connection.search(search_base=self.domaincomponents,
-			search_filter=filter,
-			search_scope='SUBTREE',
-			attributes='*')
-		
-		res = self.connection.response_to_json()
-		formattedentries = response_properties_subset(res,["distinguishedName","msDS-AllowedToDelegateTo"])
-		if len(formattedentries) == 0:
-			self.writeline(f"lookup for sid {sid} failed") #error log
-			return
-		dn = formattedentries[0]["distinguishedName"]
-		self.writeline(f"Found entity w/ sid {sid} and distinguishedName: {dn}.") # debug level
-		old = formattedentries[0]["msDS-AllowedToDelegateTo"]
-		self.writeline(f"{sid} previous msDs-AllowedToDelegateTo: {old}.") # normal level?
-		
-		updatecommand = append_msds_allowedtodelegateto(spn)
-		self.connection.modify(dn,updatecommand)
-
-		self.connection.search(search_base=self.domaincomponents,
-			search_filter=filter,
-			search_scope='SUBTREE',
-			attributes='*')
-		res = self.connection.response_to_json()
-		formattedentries = response_properties_subset(res,["msDS-AllowedToDelegateTo"])
-		new = formattedentries[0]["msDS-AllowedToDelegateTo"]
-		self.writeline(f"{sid} updated msDs-AllowedToDelegateTo: {new}.") # normal level?
-
+		command = writeMsDSAllowedToDelegateToCommand(spn,sid)
+		self.mediator.handle(self.connection, self.domaincomponents, command)
 
 	def do_enum_server_info(self, arg):
 		'gets server info from DSE. '		

@@ -28,6 +28,7 @@ UAC_FLAGS = {
 	16777216: "TRUSTED_TO_AUTH_FOR_DELEGATION",
 	67108864: "PARTIAL_SECRETS_ACCOUNT"
 }
+UAC_FLAG_DESCRS_TO_FLAGS = {v: k for k, v in UAC_FLAGS.items()}
 
 # Should be case insensitive by default
 USEFUL_SPNS = [
@@ -55,6 +56,7 @@ def is_common_spn(spn):
 			return True
 	return False
 
+# ldap3 get queries
 def get_users_filter(nameLike = ''):
 	base = "(&(objectClass=user)(objectClass=person))"
 	if nameLike != '':
@@ -79,8 +81,17 @@ def get_object_with_sid_filter(sid):
 	filt = f"(objectSid={sid})"
 	return filt
 
-def append_msds_allowedtodelegateto(spn):
+# ldap3 modify operations
+def get_append_msds_allowedtodelegateto_operation(spn):
 	command = { "msDS-AllowedToDelegateTo": [(MODIFY_ADD, [spn])] }
+	return command
+
+def get_set_msds_allowedtoactonbehalfof_operation(securitydescriptor):
+	command = { "msds-allowedtoactonbehalfofotheridentity": [(MODIFY_REPLACE, [securitydescriptor])] }
+	return command
+
+def get_set_uac_operation(newuac):
+	command = { "userAccountControl": [(MODIFY_REPLACE, [newuac])]}
 	return command
 
 def format_ldap_domain_components(domainName):
