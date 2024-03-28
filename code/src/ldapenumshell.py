@@ -12,6 +12,7 @@ from code.src.Commands.writeMsDSAllowedToDelegateToCommand import writeMsDSAllow
 from code.src.Commands.writeUacFlagsCommand import writeUacFlagsCommand
 from code.src.Commands.writeSPNToUserCommand import writeSPNToUserCommand
 from code.src.Commands.writeUserToGroupCommand import writeUserToGroupCommand
+from code.src.Commands.enumGroupsCommand import enumGroupsCommand
 
 class LDAPEnumShell(cmd.Cmd):
 	intro = '\n\n\nLDAP Enumerator Shell\n\nFor LDAP Enumeration.  ? or help for more info\n\n\n'
@@ -167,10 +168,19 @@ class LDAPEnumShell(cmd.Cmd):
 		self.connection.search(search_base=self.domaincomponents,
 			search_filter=filter,
 			search_scope='SUBTREE',
-			attributes='*')
+			attributes=[ldap3.ALL_ATTRIBUTES, 'nTSecurityDescriptor'])
 
 		res = self.connection.response_to_json()
 		
+		# TODO: Rewrite it to be part of the rest of the parsing
+		for e in self.connection.entries:
+			#print(e.entry_to_json())
+			p = json.loads(e.entry_to_json())
+			print(p)
+			print("Secd: " + p["attributes"]["nTSecurityDescriptor"][0]["encoded"])
+			print("Change")
+			parse_security_descriptor(p["attributes"]["nTSecurityDescriptor"][0]["encoded"])
+
 		if self.verbose:
 			formattedentries = response_properties_all_formatted(res)
 		else:
@@ -186,7 +196,9 @@ class LDAPEnumShell(cmd.Cmd):
 
 		# TODO: Figure out the logging situation, really need 2 self.writelines (one for debug level, one for normal)
 		# e.g. printing filter is a debug level log, -verbose should just add the additional properties
-		self.writeline(json.dumps(formattedentries, indent=4))
+		
+		# TODO: Turn back on
+		#self.writeline(json.dumps(formattedentries, indent=4))
 				
 		# TODO: Clear entries after query?  
 
@@ -202,21 +214,23 @@ class LDAPEnumShell(cmd.Cmd):
 		for e in self.connection.entries:
 			print(e.entry_to_json())
 
-	def do_enum_groups(self, arg):
-		'gets groups'		
-		self.connection.search(search_base=self.domaincomponents,
-			search_filter='(objectClass=group)',
-			search_scope='SUBTREE',
-			attributes='*')
+	def do_enum_groups(self, args):
+		'gets groups. -like <phrase> to search for groups w/ that phrase in their name'		
 
-		res = self.connection.response_to_json()
-		
+		argsparsed = find_args(["-like"], args)
+		like = ''
+		if argsparsed:
+			like = argsparsed["-like"]
+	
+		command = enumGroupsCommand(like)
+		res = self.mediator.handle(command, self.connection, self.domaincomponents)
 		if self.verbose:
 			formattedentries = response_properties_all_formatted(res)
 		else:
 			formattedentries = response_properties_subset(res,["name","member","memberOf"])
+		
 		self.writeline(json.dumps(formattedentries, indent=4))	
-	
+
 	def do_enum_computers(self, arg):
 		dn = "CN=computers," + self.domaincomponents
 		self.connection.search(search_base=self.domaincomponents,
@@ -345,9 +359,12 @@ class LDAPEnumShell(cmd.Cmd):
 			print("ERROR: no -sid passed") # Error log
 
 	def do_write_user_to_group(self, args):
-		'write -TODO to group -TODO w/ TODO format for ids you get it'
-		argsparsed = find_args(["-TODO","-victimsid"], args)
-		# TODO: Any printing or post-proc
+		'write -usersid to group -groupsid'
+		argsparsed = find_args(["-usersid","-groupsid"], args)
+		usersid = argsparsed["-usersid"]
+		groupsid = argsparsed["-groupsid"]
+		command = writeUserToGroupCommand(groupsid,usersid)
+		self.mediator.handle(command, self.connection, self.domaincomponents)
 
 	def do_write_msDS_AllowedToActOnBehalfOfOtherIdentity(self, args):
 		'write -valuesid sid to the msDS-AllowedToActOnBehalf... attribute of object w/ sid=-victimsid'

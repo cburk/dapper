@@ -1,4 +1,4 @@
 class writeUserToGroupCommand():
-    def __init__(self, sid, spn):
-        self.sid = sid
-        self.spn = spn
+    def __init__(self, groupsid, usersid):
+        self.groupsid = groupsid
+        self.usersid = usersid

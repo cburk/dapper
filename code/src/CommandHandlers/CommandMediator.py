@@ -3,6 +3,7 @@ from code.src.CommandHandlers.WriteUacFlagsHandler import writeUacFlagsHandler
 from code.src.CommandHandlers.writeSPNToUserCommandHandler import writeSPNToUserCommandHandler
 from code.src.CommandHandlers.writeUserToGroupCommandHandler import writeUserToGroupCommandHandler
 from code.src.CommandHandlers.writeMsDSAllowedToDelegateToCommandHandler import writeMsDSAllowedToDelegateToCommandHandler
+from code.src.CommandHandlers.enumGroupsCommandHandler import enumGroupsCommandHandler
 
 class CommandMediator():
     def __init__(self):
@@ -13,9 +14,10 @@ class CommandMediator():
             "writeUacFlagsCommand": writeUacFlagsHandler(),
             "writeSPNToUserCommand": writeSPNToUserCommandHandler(),
             "writeUserToGroupCommand": writeUserToGroupCommandHandler(),
-            "writeMsDSAllowedToDelegateToCommand": writeMsDSAllowedToDelegateToCommandHandler()
+            "writeMsDSAllowedToDelegateToCommand": writeMsDSAllowedToDelegateToCommandHandler(),
+            "enumGroupsCommand": enumGroupsCommandHandler()
         }
 
     def handle(self, command, connection, domaincomponents):
         handler = self.mapping[(type(command).__name__)]
-        handler.handle(command, connection, domaincomponents)
+        return handler.handle(command, connection, domaincomponents)
